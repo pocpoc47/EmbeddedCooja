@@ -11,14 +11,7 @@
 #include "net/rime/rime.h"
 #include "dev/button-sensor.h"
 
-#include "node.h"
-
-/*
-static struct uip_udp_conn *client_conn;
-static uip_ipaddr_t server_ipaddr;
-static struct runicast_conn runicast;
-static struct runicast_callbacks data_runicast_call = 0;
-*/
+#include "node_r.h"
 
 static linkaddr_t my_parent;
 static linkaddr_t children[MAX_CHILDREN];
@@ -32,8 +25,8 @@ int num_orphan_neighbours = 0;
 int has_parent = 0;
 int i_am_root = 0;
 
-PROCESS(unicast_process, "unicast process");
-AUTOSTART_PROCESSES(&unicast_process);
+PROCESS(runicast_process, "runicast process");
+AUTOSTART_PROCESSES(&runicast_process);
 
 static int contains_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	int i;
@@ -49,15 +42,8 @@ static int insert_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	if(contains_addr(addr,array,arraySize)){
 		return 0;
 	}
-	/*
-	printf("pointer: %p\n",array);
-	printf("size = %d\n",*arraySize);
-	printf("0: %d\n",array[0].u8[0]);
-	printf("1: %d\n",array[1].u8[0]);
-	printf("2: %d\n",array[2].u8[0]);
-	*/
 	array[(*arraySize)++] = *addr;
-	//printf("added %d.%d to the list\n",addr->u8[0],addr->u8[1]);
+	printf("added %d.%d to the list\n",addr->u8[0],addr->u8[1]);
 	return 1;
 }
 static void add_neighbour(linkaddr_t* nb){
@@ -81,7 +67,7 @@ static void recv_discover(linkaddr_t* disc){
 	pck.src = linkaddr_node_addr;
 	pck.message = "hello je t'entends\n";
 	packetbuf_copyfrom(&pck,sizeof(packet));
-	unicast_send(&uconn,&pck.dst);
+	runicast_send(&ruconn,&pck.dst,MAX_TX);
 }
 
 static void recv_broadcast(struct broadcast_conn *conn, const linkaddr_t *from){
@@ -135,11 +121,16 @@ static void adopt(linkaddr_t* child){
 	pck.src = linkaddr_node_addr;
 	pck.dst = *child;
 	pck.message = "I want to adopt you\n";
-	printf("trying to adopt %d\n",child->u8[0]);
-	packetbuf_copyfrom(&pck,sizeof(packet));
-	printf("trying to adopt %d\n",child->u8[0]);
-	unicast_send(&uconn,child);
-	printf("trying to adopt %d\n",child->u8[0]);
+	if(!runicast_is_transmitting(&ruconn)){
+		printf("trying to adopt %d\n",child->u8[0]);
+		printf("pck trying to adopt %d\n",pck.dst.u8[0]);
+		packetbuf_copyfrom(&pck,sizeof(packet));
+		printf("trying to adopt %d\n",child->u8[0]);
+		printf("pck trying to adopt %d\n",pck.dst.u8[0]);
+		runicast_send(&ruconn,&pck.dst,MAX_TX);
+		printf("trying to adopt %d\n",child->u8[0]);
+		printf("pck trying to adopt %d\n",pck.dst.u8[0]);
+	}
 }
 static void adopt_children(){
 	int i;
@@ -172,15 +163,15 @@ static void recv_hello(packet* pck){
 	//I DONT ADOPT IF I DONT HAVE A PARENT
 	//add him to the neighbours list
 	add_neighbour(&pck->src);
+	printf("%d is my neighbour\n",pck->src.u8[0]);
 	if((i_am_root || has_parent) && pck->type==HELLO_ORPHAN && num_children < MAX_CHILDREN){
 		adopt(&pck->src);
 	}
-	
-	//printf("%d.%d is my neighbour\n",pck->src.u8[0],pck->src.u8[1]);
+	printf("%d is my neighbour\n",pck->src.u8[0]);
 }
 //received an adoption request, answer PARENT_ACK if im an orphan, and saves parent as my actual parent
 static void get_adopted(linkaddr_t* parent){
-
+	printf("%d is trying to adopt me\n",parent->u8[0]);
 	if(i_am_root){
 		printf("root doesn't need a parent duh\n");
 	}
@@ -195,7 +186,7 @@ static void get_adopted(linkaddr_t* parent){
 		my_parent = *parent;
 		
 		packetbuf_copyfrom(&pck_ack,sizeof(packet));
-		unicast_send(&uconn,parent);
+		runicast_send(&ruconn,parent,MAX_TX);
 	}
 	else{
 		printf("already have a parent\n");
@@ -230,7 +221,10 @@ static void confirm_adoption(linkaddr_t* child){
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
 }
-static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
+static void timeout_runicast(struct runicast_conn *conn,const linkaddr_t* to,int numtx){
+	printf("timeout %d\n",to->u8[0]);
+}
+static void recv_runicast(struct runicast_conn *conn, const linkaddr_t *from, int seqnum){
 	packet* pck = (packet*)packetbuf_dataptr();
 	add_neighbour(from);
 	if(linkaddr_cmp(&pck->dst,&linkaddr_node_addr)){
@@ -250,15 +244,11 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	}
 	else{
 		packetbuf_copyfrom(pck,sizeof(*pck));
-		unicast_send(&uconn,&my_parent);
+		runicast_send(&ruconn,&my_parent,MAX_TX);
 		printf("from %d relay to parent %d\n",from->u8[0],my_parent.u8[0]);
 	}
 }
-static void sent_unicast(struct unicast_conn *conn, int status, int num_tx){
-	const linkaddr_t *dest = packetbuf_addr(PACKETBUF_ADDR_RECEIVER);
-	if(linkaddr_cmp(dest, &linkaddr_null)){
-		return;
-	}
+static void sent_runicast(struct runicast_conn *conn, int status, int num_tx){
 	//printf("unicast sent to %d.%d: status %d num_tx: %d\n",dest->u8[0],dest->u8[1],status,num_tx);
 }
 /*
@@ -272,10 +262,10 @@ static void child_discovery(){
 */
 
 
-static const struct unicast_callbacks unicast_callbacks = {recv_unicast,sent_unicast};
+static const struct runicast_callbacks runicast_callbacks = {recv_runicast,sent_runicast, timeout_runicast};
 static const struct broadcast_callbacks broadcast_callbacks = {recv_broadcast,sent_broadcast};
 
-PROCESS_THREAD(unicast_process, ev, data){
+PROCESS_THREAD(runicast_process, ev, data){
 	PROCESS_BEGIN();
 	server_addr.u8[0] = 1;
 	server_addr.u8[1] = 0;
@@ -283,10 +273,10 @@ PROCESS_THREAD(unicast_process, ev, data){
 		i_am_root=1;
 	}
 	SENSORS_ACTIVATE(button_sensor);
-	unicast_open(&uconn,146,&unicast_callbacks);
+	runicast_open(&ruconn,144,&runicast_callbacks);
 	broadcast_open(&bconn,129,&broadcast_callbacks);
 	static struct etimer et;
-	etimer_set(&et, CLOCK_SECOND*linkaddr_node_addr.u8[0]*2);
+	//etimer_set(&et, CLOCK_SECOND*linkaddr_node_addr.u8[0]*2);
 	while(1){
 		PROCESS_WAIT_EVENT();
 		if(ev == sensors_event){
@@ -294,7 +284,7 @@ PROCESS_THREAD(unicast_process, ev, data){
 			printf("button pressed\n");
 			discover();
 		}
-		if(etimer_expired(&et)){
+		else if(etimer_expired(&et)){
 			discover();
 			etimer_set(&et, CLOCK_SECOND*20);
 		}
