@@ -7,7 +7,7 @@
   <project EXPORT="discard">[APPS_DIR]/collect-view</project>
   <project EXPORT="discard">[APPS_DIR]/powertracker</project>
   <simulation>
-    <title>testR</title>
+    <title>testUnicast</title>
     <randomseed>123456</randomseed>
     <motedelay_us>1000000</motedelay_us>
     <radiomedium>
@@ -24,9 +24,9 @@
       org.contikios.cooja.mspmote.Z1MoteType
       <identifier>z11</identifier>
       <description>Z1 Mote Type #z11</description>
-      <source EXPORT="discard">[CONTIKI_DIR]/project2/EmbeddedCooja/node_r.c</source>
-      <commands EXPORT="discard">make node_r.z1 TARGET=z1</commands>
-      <firmware EXPORT="copy">[CONTIKI_DIR]/project2/EmbeddedCooja/node_r.z1</firmware>
+      <source EXPORT="discard">[CONTIKI_DIR]/project2/EmbeddedCooja/node.c</source>
+      <commands EXPORT="discard">make node.z1 TARGET=z1</commands>
+      <firmware EXPORT="copy">[CONTIKI_DIR]/project2/EmbeddedCooja/node.z1</firmware>
       <moteinterface>org.contikios.cooja.interfaces.Position</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.RimeAddress</moteinterface>
       <moteinterface>org.contikios.cooja.interfaces.IPAddress</moteinterface>
@@ -44,8 +44,8 @@
       <breakpoints />
       <interface_config>
         org.contikios.cooja.interfaces.Position
-        <x>74.36932819523349</x>
-        <y>20.407855804006303</y>
+        <x>30.25066518500439</x>
+        <y>16.85603843711205</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -62,8 +62,8 @@
       <breakpoints />
       <interface_config>
         org.contikios.cooja.interfaces.Position
-        <x>86.86381122350859</x>
-        <y>42.54529143134208</y>
+        <x>60.60937944423971</x>
+        <y>72.41931592846056</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -80,8 +80,8 @@
       <breakpoints />
       <interface_config>
         org.contikios.cooja.interfaces.Position
-        <x>58.11589420398633</x>
-        <y>39.53587708400472</y>
+        <x>65.1035308620882</x>
+        <y>16.284253579546352</y>
         <z>0.0</z>
       </interface_config>
       <interface_config>
@@ -94,11 +94,65 @@
       </interface_config>
       <motetype_identifier>z11</motetype_identifier>
     </mote>
+    <mote>
+      <breakpoints />
+      <interface_config>
+        org.contikios.cooja.interfaces.Position
+        <x>75.33778030733541</x>
+        <y>18.45866027419212</y>
+        <z>0.0</z>
+      </interface_config>
+      <interface_config>
+        org.contikios.cooja.mspmote.interfaces.MspClock
+        <deviation>1.0</deviation>
+      </interface_config>
+      <interface_config>
+        org.contikios.cooja.mspmote.interfaces.MspMoteID
+        <id>4</id>
+      </interface_config>
+      <motetype_identifier>z11</motetype_identifier>
+    </mote>
+    <mote>
+      <breakpoints />
+      <interface_config>
+        org.contikios.cooja.interfaces.Position
+        <x>32.57889102047815</x>
+        <y>56.677216073390326</y>
+        <z>0.0</z>
+      </interface_config>
+      <interface_config>
+        org.contikios.cooja.mspmote.interfaces.MspClock
+        <deviation>1.0</deviation>
+      </interface_config>
+      <interface_config>
+        org.contikios.cooja.mspmote.interfaces.MspMoteID
+        <id>5</id>
+      </interface_config>
+      <motetype_identifier>z11</motetype_identifier>
+    </mote>
+    <mote>
+      <breakpoints />
+      <interface_config>
+        org.contikios.cooja.interfaces.Position
+        <x>60.60976553708992</x>
+        <y>42.33331845455112</y>
+        <z>0.0</z>
+      </interface_config>
+      <interface_config>
+        org.contikios.cooja.mspmote.interfaces.MspClock
+        <deviation>1.0</deviation>
+      </interface_config>
+      <interface_config>
+        org.contikios.cooja.mspmote.interfaces.MspMoteID
+        <id>6</id>
+      </interface_config>
+      <motetype_identifier>z11</motetype_identifier>
+    </mote>
   </simulation>
   <plugin>
     org.contikios.cooja.plugins.SimControl
     <width>280</width>
-    <z>4</z>
+    <z>0</z>
     <height>160</height>
     <location_x>400</location_x>
     <location_y>0</location_y>
@@ -110,12 +164,12 @@
       <skin>org.contikios.cooja.plugins.skins.IDVisualizerSkin</skin>
       <skin>org.contikios.cooja.plugins.skins.TrafficVisualizerSkin</skin>
       <skin>org.contikios.cooja.plugins.skins.GridVisualizerSkin</skin>
-      <skin>org.contikios.cooja.plugins.skins.MoteTypeVisualizerSkin</skin>
       <skin>org.contikios.cooja.plugins.skins.UDGMVisualizerSkin</skin>
-      <viewport>2.6494746411064103 0.0 0.0 2.6494746411064103 40.62449228475032 50.27867324693051</viewport>
+      <skin>org.contikios.cooja.plugins.skins.MoteTypeVisualizerSkin</skin>
+      <viewport>3.2426902529687918 0.0 0.0 3.2426902529687918 53.862124199200096 32.01423320975647</viewport>
     </plugin_config>
     <width>400</width>
-    <z>0</z>
+    <z>4</z>
     <height>400</height>
     <location_x>1</location_x>
     <location_y>1</location_y>
@@ -128,8 +182,8 @@
       <coloring />
     </plugin_config>
     <width>1200</width>
-    <z>3</z>
-    <height>240</height>
+    <z>2</z>
+    <height>420</height>
     <location_x>400</location_x>
     <location_y>160</location_y>
   </plugin>
@@ -139,16 +193,19 @@
       <mote>0</mote>
       <mote>1</mote>
       <mote>2</mote>
+      <mote>3</mote>
+      <mote>4</mote>
+      <mote>5</mote>
       <showRadioRXTX />
       <showRadioHW />
       <showLEDs />
       <zoomfactor>500.0</zoomfactor>
     </plugin_config>
     <width>1600</width>
-    <z>2</z>
-    <height>166</height>
+    <z>3</z>
+    <height>193</height>
     <location_x>0</location_x>
-    <location_y>634</location_y>
+    <location_y>607</location_y>
   </plugin>
   <plugin>
     org.contikios.cooja.plugins.Notes
@@ -157,10 +214,24 @@
       <decorations>true</decorations>
     </plugin_config>
     <width>920</width>
-    <z>1</z>
+    <z>5</z>
     <height>160</height>
     <location_x>680</location_x>
     <location_y>0</location_y>
+  </plugin>
+  <plugin>
+    org.contikios.cooja.plugins.RadioLogger
+    <plugin_config>
+      <split>246</split>
+      <formatted_time />
+      <showdups>false</showdups>
+      <hidenodests>false</hidenodests>
+    </plugin_config>
+    <width>500</width>
+    <z>1</z>
+    <height>421</height>
+    <location_x>969</location_x>
+    <location_y>37</location_y>
   </plugin>
 </simconf>
 

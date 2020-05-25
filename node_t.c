@@ -22,7 +22,7 @@ static struct runicast_callbacks data_runicast_call = 0;
 
 static linkaddr_t my_parent;
 static linkaddr_t children[MAX_CHILDREN];
-static linkaddr_t neighbours[10];
+static int neighbours[MAX_NEIGHBOURS];
 static linkaddr_t orphan_neighbours[10];
 static linkaddr_t server_addr;
 
@@ -35,6 +35,30 @@ int i_am_root = 0;
 PROCESS(unicast_process, "unicast process");
 AUTOSTART_PROCESSES(&unicast_process);
 
+static void print_array(linkaddr_t* array,int* arraySize){
+	int i;
+	for(i = 0;i < *arraySize; i++){
+		printf("%d, ",array[i].u8[0]);
+	}
+	printf("\n");
+}
+static void print_children(){
+	printf("My %d children: ",num_children);
+	print_array(children,&num_children);
+}
+static void print_neighbours(){
+	printf("My neighbours: ");
+	int i ;
+	for(i = 0;i < MAX_NEIGHBOURS;i++){
+		if(neighbours[i]!=0){
+			printf("%d, ",i);
+		}
+	}
+	printf("\n");
+}
+static void print_parent(){
+	printf("My parent: %d.%d\n",my_parent.u8[0],my_parent.u8[1]);
+}
 static int contains_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	int i;
 	for(i=0;i < *arraySize;i++){
@@ -43,6 +67,9 @@ static int contains_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 		}
 	}
 	return 0;
+}
+static int contains_nb(linkaddr_t* addr){
+	return neighbours[addr->u8[0]];
 }
 
 static int insert_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
@@ -60,15 +87,15 @@ static int insert_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	//printf("added %d.%d to the list\n",addr->u8[0],addr->u8[1]);
 	return 1;
 }
-static void add_neighbour(linkaddr_t* nb){
-	insert_addr(nb,neighbours,&num_neighbours);
+static void add_neighbour(linkaddr_t* addr){
+	neighbours[addr->u8[0]] = 3;
 }
 
 //I received a discover by broadcast from disc
 static void recv_discover(linkaddr_t* disc){
 	packet pck;
 	//he is now my neihgbour
-	printf("DISCOVER FROM %d\n",disc->u8[0]);
+	//printf("DISCOVER FROM %d\n",disc->u8[0]);
 	add_neighbour(disc);
 	//I respond with a HELLO packet, ORPHAN if I need a parent, CHILD otherwise
 	if(has_parent || i_am_root){
@@ -76,6 +103,7 @@ static void recv_discover(linkaddr_t* disc){
 	}
 	else{
 		pck.type = HELLO_ORPHAN;
+		printf("pls i am orphan\n");
 	}
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
@@ -100,12 +128,16 @@ static void sent_broadcast(struct broadcast_conn *conn, int status, int num_tx){
 
 //remove parent if he is no longer a neighbour
 static void remove_dead_parent(){
-	if(!contains_addr(&my_parent, neighbours,&num_neighbours)){
+	
+	print_parent();
+	printf("contains in dead\n");
+	if(!contains_nb(&my_parent)){
 		//parent is dead :(
 		has_parent = 0;
 		my_parent = linkaddr_null;
 		printf("my parent is dead, I am now orphan\n");
 	}
+	print_parent();
 }
 
 //remove nodes that are children but not neighbours
@@ -117,7 +149,7 @@ static void remove_dead_children(){
 	for(i=0;i<num_children;i++){
 		//if the children is in the neighbours, put it again into children
 		//printf("is %d in my neighbours?\n",children[i].u8[0]);
-		if(contains_addr(&children[i],neighbours,&num_neighbours)){
+		if(contains_nb(&children[i])){
 			temp_children[new_i++] = children[i];
 		}
 		else{
@@ -139,33 +171,7 @@ static void adopt(linkaddr_t* child){
 	printf("trying to adopt %d\n",child->u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(packet));
-	printf("trying to adopt %d\n",child->u8[0]);
 	unicast_send(&uconn,child);
-	printf("trying to adopt %d\n",child->u8[0]);
-}
-static void adopt_children(){
-	int i;
-	for(i = 0;i < MAX_CHILDREN-num_children || i < num_orphan_neighbours;i++){
-		adopt(&orphan_neighbours[i]);
-	}
-}
-static void print_array(linkaddr_t* array,int* arraySize){
-	int i;
-	for(i = 0;i < *arraySize; i++){
-		printf("%d, ",array[i].u8[0]);
-	}
-	printf("\n");
-}
-static void print_children(){
-	printf("My children: ");
-	print_array(children,&num_children);
-}
-static void print_neighbours(){
-	printf("My neighbours: ");
-	print_array(neighbours,&num_neighbours);
-}
-static void print_parent(){
-	printf("My parent: %d\n",my_parent.u8[0]);
 }
 
 //I received a HELLO packet from a neighbour as response to my DISCOVER
@@ -174,11 +180,15 @@ static void recv_hello(packet* pck){
 	//I DONT ADOPT IF I DONT HAVE A PARENT
 	//add him to the neighbours list
 	add_neighbour(&pck->src);
+	print_parent();
+	printf("received hello from %d\n",pck->src.u8[0]);
 	if((i_am_root || has_parent) && pck->type==HELLO_ORPHAN && num_children < MAX_CHILDREN){
 		adopt(&pck->src);
 	}
+	print_parent();
+
 	
-	printf("%d.%d is my neighbour\n",pck->src.u8[0],pck->src.u8[1]);
+	//printf("%d.%d is my neighbour\n",pck->src.u8[0],pck->src.u8[1]);
 }
 //received an adoption request, answer PARENT_ACK if im an orphan, and saves parent as my actual parent
 static void get_adopted(linkaddr_t* parent){
@@ -194,7 +204,10 @@ static void get_adopted(linkaddr_t* parent){
 		pck_ack.src = linkaddr_node_addr;
 		pck_ack.message = "You adopted me\n";
 		has_parent = 1;
+		print_parent();
+		printf("get_adopted\n");
 		my_parent = *parent;
+		print_parent();
 		
 		packetbuf_clear();
 		packetbuf_copyfrom(&pck_ack,sizeof(packet));
@@ -205,10 +218,19 @@ static void get_adopted(linkaddr_t* parent){
 	}
 }
 //Sending a broadcast to discover a node's neighbours
+static void trim_neighbours(){
+	int i;
+	for(i = 0;i<MAX_NEIGHBOURS;i++){
+		if(neighbours[i]>0){
+			neighbours[i]--;
+		}
+	}
+}
 static void discover(){
 	print_neighbours();
 	print_children();
 	print_parent();
+	trim_neighbours();
 	remove_dead_children();
 	if(has_parent && !i_am_root){
 		remove_dead_parent();

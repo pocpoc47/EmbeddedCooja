@@ -66,8 +66,11 @@ static void recv_discover(linkaddr_t* disc){
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
 	pck.message = "hello je t'entends\n";
-	packetbuf_copyfrom(&pck,sizeof(packet));
-	runicast_send(&ruconn,&pck.dst,MAX_TX);
+	if(!runicast_is_transmitting(&ruconn)){
+
+		packetbuf_copyfrom(&pck,sizeof(packet));
+		runicast_send(&ruconn,&pck.dst,MAX_TX);
+	}
 }
 
 static void recv_broadcast(struct broadcast_conn *conn, const linkaddr_t *from){
@@ -122,14 +125,23 @@ static void adopt(linkaddr_t* child){
 	pck.dst = *child;
 	pck.message = "I want to adopt you\n";
 	if(!runicast_is_transmitting(&ruconn)){
+		printf("child ptr: %p\n",child->u8);	
 		printf("trying to adopt %d\n",child->u8[0]);
-		printf("pck trying to adopt %d\n",pck.dst.u8[0]);
-		packetbuf_copyfrom(&pck,sizeof(packet));
+		//prints the correct value (3)
+
+		int b = packetbuf_copyfrom(&pck,sizeof(packet));
+		printf("%d bytes size\n",sizeof(packet));
+		printf("%d bytes size\n",sizeof(pck));
+		printf("%d bytes sopied\n",b);
+		
+		printf("child ptr: %p\n",child->u8);	
 		printf("trying to adopt %d\n",child->u8[0]);
-		printf("pck trying to adopt %d\n",pck.dst.u8[0]);
+		//prints 1
+		
 		runicast_send(&ruconn,&pck.dst,MAX_TX);
+		printf("child ptr: %p\n",child->u8);	
 		printf("trying to adopt %d\n",child->u8[0]);
-		printf("pck trying to adopt %d\n",pck.dst.u8[0]);
+		//prints 146 (value of runicast channel)
 	}
 }
 static void adopt_children(){
@@ -184,9 +196,11 @@ static void get_adopted(linkaddr_t* parent){
 		pck_ack.message = "You adopted me\n";
 		has_parent = 1;
 		my_parent = *parent;
+		if(!runicast_is_transmitting(&ruconn)){
 		
-		packetbuf_copyfrom(&pck_ack,sizeof(packet));
-		runicast_send(&ruconn,parent,MAX_TX);
+			packetbuf_copyfrom(&pck_ack,sizeof(packet));
+			runicast_send(&ruconn,parent,MAX_TX);
+		}
 	}
 	else{
 		printf("already have a parent\n");
@@ -243,8 +257,10 @@ static void recv_runicast(struct runicast_conn *conn, const linkaddr_t *from, in
 		}
 	}
 	else{
-		packetbuf_copyfrom(pck,sizeof(*pck));
-		runicast_send(&ruconn,&my_parent,MAX_TX);
+		if(!runicast_is_transmitting(&ruconn)){
+			packetbuf_copyfrom(pck,sizeof(*pck));
+			runicast_send(&ruconn,&my_parent,MAX_TX);
+		}
 		printf("from %d relay to parent %d\n",from->u8[0],my_parent.u8[0]);
 	}
 }
@@ -273,7 +289,7 @@ PROCESS_THREAD(runicast_process, ev, data){
 		i_am_root=1;
 	}
 	SENSORS_ACTIVATE(button_sensor);
-	runicast_open(&ruconn,144,&runicast_callbacks);
+	runicast_open(&ruconn,146,&runicast_callbacks);
 	broadcast_open(&bconn,129,&broadcast_callbacks);
 	static struct etimer et;
 	//etimer_set(&et, CLOCK_SECOND*linkaddr_node_addr.u8[0]*2);

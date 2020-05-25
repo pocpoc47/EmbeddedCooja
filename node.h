@@ -7,11 +7,11 @@
 
 
 #define MAX_CHILDREN 3
+#define MAX_NEIGHBOURS 10
 static struct unicast_conn uconn;
 static struct broadcast_conn bconn;
 
 //static linkaddr_t server_addr;
-
 
 
 
