@@ -6,7 +6,7 @@
 #define HELLO_CHILD 6
 
 
-#define MAX_CHILDREN 3
+#define MAX_CHILDREN 4
 #define MAX_NEIGHBOURS 10
 static struct unicast_conn uconn;
 static struct broadcast_conn bconn;

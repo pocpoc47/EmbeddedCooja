@@ -23,7 +23,7 @@ static struct runicast_callbacks data_runicast_call = 0;
 static linkaddr_t my_parent;
 static linkaddr_t children[MAX_CHILDREN];
 static int neighbours[MAX_NEIGHBOURS];
-static linkaddr_t orphan_neighbours[10];
+static linkaddr_t orphan_neighbours[MAX_NEIGHBOURS];
 static linkaddr_t server_addr;
 
 int num_children = 0;
@@ -103,7 +103,7 @@ static void recv_discover(linkaddr_t* disc){
 	}
 	else{
 		pck.type = HELLO_ORPHAN;
-		printf("pls i am orphan\n");
+		//printf("pls i am orphan\n");
 	}
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
@@ -129,15 +129,12 @@ static void sent_broadcast(struct broadcast_conn *conn, int status, int num_tx){
 //remove parent if he is no longer a neighbour
 static void remove_dead_parent(){
 	
-	print_parent();
-	printf("contains in dead\n");
 	if(!contains_nb(&my_parent)){
 		//parent is dead :(
 		has_parent = 0;
 		my_parent = linkaddr_null;
 		printf("my parent is dead, I am now orphan\n");
 	}
-	print_parent();
 }
 
 //remove nodes that are children but not neighbours
@@ -148,9 +145,10 @@ static void remove_dead_children(){
 	int new_i = 0;
 	for(i=0;i<num_children;i++){
 		//if the children is in the neighbours, put it again into children
-		//printf("is %d in my neighbours?\n",children[i].u8[0]);
+		//printf("is %d in my neighbours? pls answer me\n",children[i].u8[0]);
 		if(contains_nb(&children[i])){
 			temp_children[new_i++] = children[i];
+			//printf("yes\n");
 		}
 		else{
 			printf("%d is no longer my neighbour and has been removed from my children\n",children[i].u8[0]);
@@ -180,12 +178,10 @@ static void recv_hello(packet* pck){
 	//I DONT ADOPT IF I DONT HAVE A PARENT
 	//add him to the neighbours list
 	add_neighbour(&pck->src);
-	print_parent();
-	printf("received hello from %d\n",pck->src.u8[0]);
-	if((i_am_root || has_parent) && pck->type==HELLO_ORPHAN && num_children < MAX_CHILDREN){
+	//printf("received hello from %d\n",pck->src.u8[0]);
+	if((i_am_root || has_parent) && pck->type==HELLO_ORPHAN && num_children < MAX_CHILDREN && !linkaddr_cmp(&my_parent,&pck->src)){
 		adopt(&pck->src);
 	}
-	print_parent();
 
 	
 	//printf("%d.%d is my neighbour\n",pck->src.u8[0],pck->src.u8[1]);
@@ -204,10 +200,7 @@ static void get_adopted(linkaddr_t* parent){
 		pck_ack.src = linkaddr_node_addr;
 		pck_ack.message = "You adopted me\n";
 		has_parent = 1;
-		print_parent();
-		printf("get_adopted\n");
 		my_parent = *parent;
-		print_parent();
 		
 		packetbuf_clear();
 		packetbuf_copyfrom(&pck_ack,sizeof(packet));
@@ -272,12 +265,30 @@ static void confirm_adoption(linkaddr_t* child){
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
 }
+static void send_data(){
+	packet pck;
+	pck.src = linkaddr_node_addr;
+	printf("%d is me\n",pck.src.u8[0]);
+	pck.dst = server_addr;
+	pck.type= SENSOR_DATA;
+	pck.message="this is a message\n";
+	packetbuf_copyfrom(&pck,sizeof(pck));
+	unicast_send(&uconn, &my_parent);
+	
+}
+static void relay_parent(packet* pck){
+	packetbuf_clear();
+	packetbuf_copyfrom(pck,sizeof(*pck));
+	unicast_send(&uconn,&my_parent);
+	linkaddr_t s = pck->src;
+	printf("from %d relay to parent %d\n",s.u8[0],my_parent.u8[0]);
+}
 static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	packet* pck = (packet*)packetbuf_dataptr();
 	add_neighbour(from);
 	if(linkaddr_cmp(&pck->dst,&linkaddr_node_addr)){
 		if(pck->type==SENSOR_DATA){
-			printf("received message from %d\n",from->u8[0]);
+			printf("received message from %d\n",pck->src.u8[0]);
 			printf(pck->message);
 		}
 		else if(pck->type==PARENT_ACK){
@@ -291,10 +302,7 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 		}
 	}
 	else{
-		packetbuf_clear();
-		packetbuf_copyfrom(pck,sizeof(*pck));
-		unicast_send(&uconn,&my_parent);
-		printf("from %d relay to parent %d\n",from->u8[0],my_parent.u8[0]);
+		relay_parent(pck);
 	}
 }
 static void sent_unicast(struct unicast_conn *conn, int status, int num_tx){
@@ -335,6 +343,7 @@ PROCESS_THREAD(unicast_process, ev, data){
 		if(ev == sensors_event){
 
 			printf("button pressed\n");
+			send_data();
 			discover();
 		}
 		if(etimer_expired(&et)){
