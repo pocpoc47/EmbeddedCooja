@@ -105,13 +105,7 @@ static void recv_discover(linkaddr_t* disc){
 	//printf("DISCOVER FROM %d\n",disc->u8[0]);
 	add_neighbour(disc);
 	//I respond with a HELLO packet, ORPHAN if I need a parent, CHILD otherwise
-	if(has_parent){
-		pck.type = HELLO_CHILD;
-	}
-	else{
-		pck.type = HELLO_ORPHAN;
-		//printf("pls i am orphan\n");
-	}
+	pck.type = HELLO_CHILD;
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
 	pck.message = "hello je t'entends\n";
@@ -133,16 +127,6 @@ static void sent_broadcast(struct broadcast_conn *conn, int status, int num_tx){
 }
 
 
-//remove parent if he is no longer a neighbour
-static void remove_dead_parent(){
-	
-	if(!contains_nb(&my_parent)){
-		//parent is dead :(
-		has_parent = 0;
-		my_parent = linkaddr_null;
-		printf("my parent is dead, I am now orphan\n");
-	}
-}
 
 //remove nodes that are children but not neighbours
 static void remove_dead_children(){
@@ -186,35 +170,13 @@ static void recv_hello(packet* pck){
 	//add him to the neighbours list
 	add_neighbour(&pck->src);
 	//printf("received hello from %d\n",pck->src.u8[0]);
-	if(has_parent && pck->type==HELLO_ORPHAN && num_children < MAX_CHILDREN && !linkaddr_cmp(&my_parent,&pck->src)){
+	if(pck->type==HELLO_ORPHAN && num_children < MAX_CHILDREN && !linkaddr_cmp(&my_parent,&pck->src)){
 		adopt(&pck->src);
 	}
 
 	
 	//printf("%d.%d is my neighbour\n",pck->src.u8[0],pck->src.u8[1]);
 }
-//received an adoption request, answer PARENT_ACK if im an orphan, and saves parent as my actual parent
-static void get_adopted(linkaddr_t* parent){
-
-	if(!has_parent){
-		printf("%d is now my parent\n",parent->u8[0]);
-		packet pck_ack;
-		pck_ack.type = PARENT_ACK;
-		pck_ack.dst = *parent;
-		pck_ack.src = linkaddr_node_addr;
-		pck_ack.message = "You adopted me\n";
-		has_parent = 1;
-		my_parent = *parent;
-		
-		packetbuf_clear();
-		packetbuf_copyfrom(&pck_ack,sizeof(packet));
-		unicast_send(&uconn,parent);
-	}
-	else{
-		printf("already have a parent\n");
-	}
-}
-//Sending a broadcast to discover a node's neighbours
 static void trim_neighbours(){
 	int i;
 	for(i = 0;i<MAX_NEIGHBOURS;i++){
@@ -223,15 +185,12 @@ static void trim_neighbours(){
 		}
 	}
 }
+//Sending a broadcast to discover a node's neighbours
 static void discover(){
 	print_neighbours();
 	print_children();
-	print_parent();
 	trim_neighbours();
 	remove_dead_children();
-	if(has_parent){
-		remove_dead_parent();
-	}
 
 	/*
 	tableau de voisins
@@ -274,24 +233,16 @@ static void confirm_adoption(linkaddr_t* child){
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
 }
-static void send_data(){
+static void send_data(linkaddr_t* to){
 	packet pck;
 	pck.src = linkaddr_node_addr;
 	printf("%d is me\n",pck.src.u8[0]);
-	pck.dst = server_addr;
-	pck.type= SENSOR_DATA;
+	pck.dst = *to;
+	pck.type= SENSOR_COMMAND;
 	pck.message="this is a message\n";
 	packetbuf_copyfrom(&pck,sizeof(pck));
-	unicast_send(&uconn, &my_parent);
+	unicast_send(&uconn, &route[to->u8[0]]);
 	
-}
-static void relay_parent(packet* pck, linkaddr_t* from){
-	add_route(&pck->src, from);
-	packetbuf_clear();
-	packetbuf_copyfrom(pck,sizeof(*pck));
-	unicast_send(&uconn,&my_parent);
-	linkaddr_t s = pck->src;
-	printf("from %d relay to parent %d\n",s.u8[0],my_parent.u8[0]);
 }
 static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	packet* pck = (packet*)packetbuf_dataptr();
@@ -307,12 +258,8 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 		else if(pck->type==HELLO_ORPHAN || pck->type==HELLO_CHILD){
 			recv_hello(pck);
 		}
-		if(pck->type == CHILD_HELLO){
-			get_adopted(&pck->src);
-		}
 	}
 	else{
-		relay_parent(pck, from);
 	}
 }
 static void sent_unicast(struct unicast_conn *conn, int status, int num_tx){
@@ -350,8 +297,6 @@ PROCESS_THREAD(unicast_process, ev, data){
 		if(ev == sensors_event){
 
 			printf("button pressed\n");
-			send_data();
-			discover();
 		}
 		if(etimer_expired(&et)){
 			discover();

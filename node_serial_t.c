@@ -33,6 +33,65 @@ int has_parent = 0;
 PROCESS(unicast_process, "unicast process");
 AUTOSTART_PROCESSES(&unicast_process);
 
+static packet unserialize(char* string){
+	packet pck;
+	printf("%s\n", string);
+	int u0 = string[0]-'0';
+	int u1 = string[1]-'0';
+	//printf("u1 = %d\n",u1);
+	pck.src.u8[0] = (u0*10)+u1;
+	u0 = string[2]-'0';
+	u1 = string[3]-'0';
+	pck.dst.u8[0] = (u0*10)+u1;
+	pck.type = ((string[4]-'0')*10)+(string[5]-'0');
+	string += 6;
+	//printf("s+6: %s\n", string);
+	//strcpy(pck.message,string);
+	//printf("%d to %d\n",pck.src.u8[0],pck.dst.u8[0]);
+	//printf("type %d\n", pck.type);
+	//printf("len %d\n",strlen(string));
+	printf("uns m: %s\n", pck.message);
+}
+static char* serialize(packet* pck){
+	char string[128] = "";
+	if(pck->src.u8[0]>9){
+		sprintf(string+strlen(string),"%d",pck->src.u8[0]);
+	}
+	else{
+		sprintf(string+strlen(string),"0%d",pck->src.u8[0]);	
+	}
+	if(pck->dst.u8[0]>9){
+		sprintf(string+strlen(string),"%d",pck->dst.u8[0]);
+	}
+	else{
+		sprintf(string+strlen(string),"0%d",pck->dst.u8[0]);	
+	}
+	if(pck->type>9){
+		sprintf(string+strlen(string),"%d",pck->type);
+	}
+	else{
+		sprintf(string+strlen(string),"0%d",pck->type);	
+	}
+	sprintf(string+strlen(string),"%s",pck->message);
+	printf("serialized: %s\n",string);
+	return string;
+}
+static void send_pck_bc(packet* pck){
+	char* string;
+	strcpy(string,serialize(pck));
+
+	packetbuf_copyfrom(string,sizeof(string));
+	broadcast_send(&bconn);
+}
+static void send_pck(packet* pck, linkaddr_t* to){
+	char* string = serialize(pck);
+	packetbuf_copyfrom(string,sizeof(string));
+	unicast_send(&uconn,to);
+}
+static packet recv_pck(char* string){
+	packet pck = unserialize(string);
+	return pck;
+}
 static void print_array(linkaddr_t* array,int* arraySize){
 	int i;
 	for(i = 0;i < *arraySize; i++){
@@ -114,17 +173,19 @@ static void recv_discover(linkaddr_t* disc){
 	}
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
-	pck.message = "hello je t'entends\n";
-	packetbuf_clear();
-	packetbuf_copyfrom(&pck,sizeof(packet));
-	unicast_send(&uconn,&pck.dst);
+	//pck.message = "hello je t'entends\n";
+	//strcpy(pck.message,  "hello je t'entends");
+	send_pck(&pck,&pck.dst);
+
 }
 
 static void recv_broadcast(struct broadcast_conn *conn, const linkaddr_t *from){
 	//printf("broadcast received from %d.%d\n",from->u8[0],from->u8[1]);
-	packet* pck_rcv = (packet*) packetbuf_dataptr();
-	if(pck_rcv->type == DISCOVER){
-		recv_discover(&pck_rcv->src);
+	char* string = (char*) packetbuf_dataptr();
+	printf("s%s\n",string);
+	packet pck = recv_pck(string);
+	if(pck.type == DISCOVER){
+		recv_discover(&pck.src);
 	}
 }
 
@@ -172,11 +233,10 @@ static void adopt(linkaddr_t* child){
 	pck.type = CHILD_HELLO;
 	pck.src = linkaddr_node_addr;
 	pck.dst = *child;
-	pck.message = "I want to adopt you\n";
+	//pck.message = "I want to adopt you\n";
+	//strcpy(pck.message, "I want to adopt you\n");
 	printf("trying to adopt %d\n",child->u8[0]);
-	packetbuf_clear();
-	packetbuf_copyfrom(&pck,sizeof(packet));
-	unicast_send(&uconn,child);
+	send_pck(&pck,child);
 }
 
 //I received a HELLO packet from a neighbour as response to my DISCOVER
@@ -202,13 +262,13 @@ static void get_adopted(linkaddr_t* parent){
 		pck_ack.type = PARENT_ACK;
 		pck_ack.dst = *parent;
 		pck_ack.src = linkaddr_node_addr;
-		pck_ack.message = "You adopted me\n";
+		//pck_ack.message = "You adopted me\n";
+		//strcpy(pck_ack.message,"You adopted me\n");
 		has_parent = 1;
 		my_parent = *parent;
 		
-		packetbuf_clear();
-		packetbuf_copyfrom(&pck_ack,sizeof(packet));
-		unicast_send(&uconn,parent);
+		send_pck(&pck_ack,parent);
+		printf("sending confirmation to %d\n",parent->u8[0]);
 	}
 	else{
 		printf("already have a parent\n");
@@ -227,6 +287,7 @@ static void discover(){
 	print_neighbours();
 	print_children();
 	print_parent();
+	print_route();
 	trim_neighbours();
 	remove_dead_children();
 	if(has_parent){
@@ -256,10 +317,9 @@ static void discover(){
 	pck.type = DISCOVER;
 	pck.src = linkaddr_node_addr;
 	pck.dst = linkaddr_null;
-	pck.message = "Est-que qqn m'entend?\n";
-	packetbuf_clear();
-	packetbuf_copyfrom(&pck,sizeof(pck));
-	broadcast_send(&bconn);
+	//pck.message = "Est-que qqn m'entend?\n";
+	//strcpy(pck.message, "Est-que qqn m'entend?\n");
+	send_pck_bc(&pck);
 }
 static void add_route(linkaddr_t* dst, linkaddr_t* child){
 	route[dst->u8[0]] = *child;
@@ -280,21 +340,20 @@ static void send_data(){
 	printf("%d is me\n",pck.src.u8[0]);
 	pck.dst = server_addr;
 	pck.type= SENSOR_DATA;
-	pck.message="this is a message\n";
-	packetbuf_copyfrom(&pck,sizeof(pck));
-	unicast_send(&uconn, &my_parent);
-	
+	//pck.message="this is a message\n";
+	//strcpy(pck.message, "this is a message\n");
+	send_pck(&pck, &server_addr);
 }
 static void relay_parent(packet* pck, linkaddr_t* from){
 	add_route(&pck->src, from);
-	packetbuf_clear();
-	packetbuf_copyfrom(pck,sizeof(*pck));
-	unicast_send(&uconn,&my_parent);
+	send_pck(pck,&my_parent);
 	linkaddr_t s = pck->src;
 	printf("from %d relay to parent %d\n",s.u8[0],my_parent.u8[0]);
 }
 static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
-	packet* pck = (packet*)packetbuf_dataptr();
+	char* string = (char*)packetbuf_dataptr();
+	packet rpck = recv_pck(string);
+	packet* pck = &rpck;
 	add_neighbour(from);
 	if(linkaddr_cmp(&pck->dst,&linkaddr_node_addr)){
 		if(pck->type==SENSOR_DATA){
@@ -350,11 +409,22 @@ PROCESS_THREAD(unicast_process, ev, data){
 		if(ev == sensors_event){
 
 			printf("button pressed\n");
-			send_data();
+			//send_data();
+			/*
+			packet pck;
+			pck.src = linkaddr_node_addr;
+			pck.dst = server_addr;
+			pck.type = HELLO_CHILD;
+			strcpy(pck.message, "myMessage");
+			char* str;
+			strcpy(str,serialize(&pck));
+			//printf("ser %s\n",str);
+			unserialize(str);
+			*/
 			discover();
 		}
 		if(etimer_expired(&et)){
-			discover();
+		//	discover();
 			etimer_set(&et, CLOCK_SECOND*20);
 		}
 	}
