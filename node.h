@@ -4,6 +4,7 @@
 #define DISCOVER 4
 #define HELLO_ORPHAN 5
 #define HELLO_CHILD 6
+#define SENSOR_COMMAND 7
 
 
 #define MAX_CHILDREN 4
@@ -21,6 +22,6 @@ typedef struct packet{
 	linkaddr_t src;
 	linkaddr_t dst;
 	int type;
-	char* message;
+	int data;
 }packet;
 

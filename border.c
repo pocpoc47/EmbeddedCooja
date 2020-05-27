@@ -63,9 +63,6 @@ static void print_neighbours(){
 	}
 	printf("\n");
 }
-static void print_parent(){
-	printf("My parent: %d.%d\n",my_parent.u8[0],my_parent.u8[1]);
-}
 static int contains_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	int i;
 	for(i=0;i < *arraySize;i++){
@@ -94,7 +91,7 @@ static int insert_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	//printf("added %d.%d to the list\n",addr->u8[0],addr->u8[1]);
 	return 1;
 }
-static void add_neighbour(linkaddr_t* addr){
+static void add_neighbour(const linkaddr_t* addr){
 	neighbours[addr->u8[0]] = 3;
 }
 
@@ -108,7 +105,6 @@ static void recv_discover(linkaddr_t* disc){
 	pck.type = HELLO_CHILD;
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
-	pck.message = "hello je t'entends\n";
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(packet));
 	unicast_send(&uconn,&pck.dst);
@@ -156,7 +152,6 @@ static void adopt(linkaddr_t* child){
 	pck.type = CHILD_HELLO;
 	pck.src = linkaddr_node_addr;
 	pck.dst = *child;
-	pck.message = "I want to adopt you\n";
 	printf("trying to adopt %d\n",child->u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(packet));
@@ -189,6 +184,7 @@ static void trim_neighbours(){
 static void discover(){
 	print_neighbours();
 	print_children();
+	print_route();
 	trim_neighbours();
 	remove_dead_children();
 
@@ -215,14 +211,13 @@ static void discover(){
 	pck.type = DISCOVER;
 	pck.src = linkaddr_node_addr;
 	pck.dst = linkaddr_null;
-	pck.message = "Est-que qqn m'entend?\n";
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	broadcast_send(&bconn);
 }
 static void add_route(linkaddr_t* dst, linkaddr_t* child){
 	route[dst->u8[0]] = *child;
-	printf("Route %d, send to %d\n", dst->u8[0], child->u8[0]);
+	//printf("Route %d, send to %d\n", dst->u8[0], child->u8[0]);
 }
 
 //received an adoption confirmation (PARENT_ACK) from a child
@@ -233,13 +228,23 @@ static void confirm_adoption(linkaddr_t* child){
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
 }
+static void recv_data(packet* rcv_pck){
+	printf("received data from %d\n", rcv_pck->src.u8[0]);
+
+	packet pck;
+	pck.src = linkaddr_node_addr;
+	pck.dst = rcv_pck->src;
+	pck.type= SENSOR_COMMAND;
+	packetbuf_copyfrom(&pck,sizeof(pck));
+	unicast_send(&uconn, &route[pck.dst.u8[0]]);
+
+}
 static void send_data(linkaddr_t* to){
 	packet pck;
 	pck.src = linkaddr_node_addr;
 	printf("%d is me\n",pck.src.u8[0]);
 	pck.dst = *to;
 	pck.type= SENSOR_COMMAND;
-	pck.message="this is a message\n";
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	unicast_send(&uconn, &route[to->u8[0]]);
 	
@@ -247,10 +252,10 @@ static void send_data(linkaddr_t* to){
 static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	packet* pck = (packet*)packetbuf_dataptr();
 	add_neighbour(from);
+	add_route(&pck->src, from);
 	if(linkaddr_cmp(&pck->dst,&linkaddr_node_addr)){
 		if(pck->type==SENSOR_DATA){
-			printf("received message from %d\n",pck->src.u8[0]);
-			printf(pck->message);
+			recv_data(pck);
 		}
 		else if(pck->type==PARENT_ACK){
 			confirm_adoption(&pck->src);
