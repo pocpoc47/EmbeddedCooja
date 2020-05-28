@@ -5,13 +5,14 @@
 #define HELLO_ORPHAN 5
 #define HELLO_CHILD 6
 #define SENSOR_COMMAND 7
+#define ABANDON_CHILD 8
 
 
 #define MAX_CHILDREN 4
 #define MAX_NEIGHBOURS 10
-#define MAX_COMP 2
-#define MAX_DATA 5
-#define COMP_SCORE 5
+#define MAX_COMP 5
+#define MAX_DATA 30
+#define COMP_SCORE 15
 static struct unicast_conn uconn;
 static struct broadcast_conn bconn;
 

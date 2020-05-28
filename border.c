@@ -153,7 +153,7 @@ static void adopt(linkaddr_t* child){
 	pck.type = CHILD_HELLO;
 	pck.src = linkaddr_node_addr;
 	pck.dst = *child;
-	printf("trying to adopt %d\n",child->u8[0]);
+	//printf("trying to adopt %d\n",child->u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(packet));
 	unicast_send(&uconn,child);
@@ -183,9 +183,9 @@ static void trim_neighbours(){
 }
 //Sending a broadcast to discover a node's neighbours
 static void discover(){
-	print_neighbours();
-	print_children();
-	print_route();
+	//print_neighbours();
+	//print_children();
+	//print_route();
 	trim_neighbours();
 	remove_dead_children();
 
@@ -224,7 +224,7 @@ static void add_route(linkaddr_t* dst, linkaddr_t* child){
 //received an adoption confirmation (PARENT_ACK) from a child
 //insert him in my children list
 static void confirm_adoption(linkaddr_t* child){
-	printf("confirming addoption of %d\n",child->u8[0]);
+	//printf("confirming addoption of %d\n",child->u8[0]);
 	add_route(child, child);
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);

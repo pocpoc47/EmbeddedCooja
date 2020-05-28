@@ -158,8 +158,7 @@ static void get_abandoned(){
 	int i;
 	for(i=0;i<num_children;i++){
 		if(!linkaddr_cmp(&linkaddr_null,&children[i])){
-			printf("removing %d\n", children[i].u8[0]);
-			abandon_child(&children[i]);
+			abandon(&children[i]);
 			children[i] = linkaddr_null;
 		}
 	}
@@ -206,7 +205,7 @@ static void adopt(linkaddr_t* child){
 	pck.type = CHILD_HELLO;
 	pck.src = linkaddr_node_addr;
 	pck.dst = *child;
-	printf("trying to adopt %d\n",child->u8[0]);
+	//printf("trying to adopt %d\n",child->u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(packet));
 	unicast_send(&uconn,child);
@@ -256,10 +255,10 @@ static void trim_neighbours(){
 	}
 }
 static void discover(){
-	print_neighbours();
-	print_children();
+	//print_neighbours();
+	//print_children();
 	print_parent();
-	print_route();
+	//print_route();
 	trim_neighbours();
 	remove_dead_children();
 	if(has_parent){
@@ -301,7 +300,7 @@ static void add_route(linkaddr_t* dst, const linkaddr_t* child){
 //received an adoption confirmation (PARENT_ACK) from a child
 //insert him in my children list
 static void confirm_adoption(linkaddr_t* child){
-	printf("confirming addoption of %d\n",child->u8[0]);
+	//printf("confirming addoption of %d\n",child->u8[0]);
 	add_route(child, child);
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
@@ -317,7 +316,7 @@ static void send_data(linkaddr_t* to, int command){
 	
 }
 static void relay_child(packet* pck){
-	printf("from server to %d, relay to child %d\n",pck->dst.u8[0],route[pck->dst.u8[0]].u8[0]);
+	//printf("from server to %d, relay to child %d\n",pck->dst.u8[0],route[pck->dst.u8[0]].u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(pck,sizeof(*pck));
 	unicast_send(&uconn,&route[pck->dst.u8[0]]);
@@ -326,7 +325,7 @@ static void relay_parent(packet* pck,const linkaddr_t* from){
 	packetbuf_clear();
 	packetbuf_copyfrom(pck,sizeof(*pck));
 	unicast_send(&uconn,&my_parent);
-	printf("from %d relay to parent %d\n",pck->src.u8[0],my_parent.u8[0]);
+	//printf("from %d relay to parent %d\n",pck->src.u8[0],my_parent.u8[0]);
 }
 
 static void free_comp(int index){
@@ -364,14 +363,16 @@ static void print_data(int index){
 		printf("%d, ", comp_data[index][(start+i)%MAX_DATA]);
 	}
 	printf("\n");
-	printf("array for %d: ", computated[index].u8[0]);
+	//printf("array for %d: ", computated[index].u8[0]);
+	/*
 	for(i = 0; i < MAX_DATA;i++){
 		printf("%d, ",comp_data[index][i]);
 	}
 	printf("\n");
+	*/
 }
 static void compute_data(int index){
-	print_data(index);
+	//print_data(index);
 	send_data(&computated[index], SENSOR_COMMAND);
 }
 static void add_comp(linkaddr_t* addr){
@@ -381,7 +382,7 @@ static void add_comp(linkaddr_t* addr){
 			break;
 	}
 	if(i==5)printf("Error, no room for new comp\n");
-	printf("adding %d in computated at i = %d\n",addr->u8[0],i);
+	//printf("adding %d in computated at i = %d\n",addr->u8[0],i);
 	computated[i] = *addr;
 	comp_data_index[i][0] = 0;
 	comp_data_index[i][1] = 0;
@@ -399,20 +400,20 @@ static void add_data(linkaddr_t* addr, int data){
 	int num = comp_data_index[i][0];
 	int next = comp_data_index[i][1];
 
-	printf("num: %d, next: %d, trying to add %d\n", num, next, data);
+	//printf("num: %d, next: %d, trying to add %d\n", num, next, data);
 	comp_data[i][next++] = data;
 	next = next%MAX_DATA;
 	if(num < MAX_DATA)num++;
 	comp_data_index[i][0] = num;
 	comp_data_index[i][1] = next;
 
-	printf("num: %d, next: %d, added  %d\n", num, next, data);
+	//printf("num: %d, next: %d, added  %d\n", num, next, data);
 
 	compute_data(i);
 }
 static int recv_data(packet* pck){
 	linkaddr_t addr = pck->src;
-	printf("received from %d, data=%d\n",pck->src.u8[0],pck->data);
+	//printf("received from %d, data=%d\n",pck->src.u8[0],pck->data);
 	if(contains_addr(&addr, computated, &num_comp)){
 		add_data(&addr, pck->data);
 		return 1;
@@ -432,13 +433,7 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	//is the packet for me?
 	if(linkaddr_cmp(&pck->dst,&linkaddr_node_addr)){
 		//printf("RECEIVED PACKET TYPE%d\n", pck->type);
-		if(pck->type==SENSOR_DATA){
-			printf("received message from %d\n",pck->src.u8[0]);
-		}
-		else if(pck->type==SENSOR_COMMAND){
-			printf("received command from server\n");
-		}
-		else if(pck->type==PARENT_ACK){
+		if(pck->type==PARENT_ACK){
 			confirm_adoption(&pck->src);
 		}
 		else if(pck->type==HELLO_ORPHAN || pck->type==HELLO_CHILD){
@@ -454,7 +449,7 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	//is the packet for the server?
 	else if(linkaddr_cmp(&pck->dst,&server_addr)){
 		add_route(&pck->src, from);
-		printf("packet for server\n");
+		//printf("packet for server\n");
 		if(pck->type==SENSOR_DATA){
 			//recv_data returns 1 if the data has been added, 0 if no room for new comp
 			if(!recv_data(pck)){
@@ -503,11 +498,6 @@ PROCESS_THREAD(unicast_process, ev, data){
 	etimer_set(&et, CLOCK_SECOND*linkaddr_node_addr.u8[0]*2);
 	while(1){
 		PROCESS_WAIT_EVENT();
-		if(ev == sensors_event){
-
-			printf("button pressed\n");
-			discover();
-		}
 		if(etimer_expired(&et)){
 			remove_points();
 			discover();
@@ -516,5 +506,4 @@ PROCESS_THREAD(unicast_process, ev, data){
 	}
 	PROCESS_END();
 }
-
 

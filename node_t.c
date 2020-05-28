@@ -112,7 +112,7 @@ static void recv_discover(linkaddr_t* disc){
 	}
 	else{
 		pck.type = HELLO_ORPHAN;
-		printf("pls i am orphan\n");
+		//printf("pls i am orphan\n");
 	}
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
@@ -148,7 +148,6 @@ static void get_abandoned(){
 	int i;
 	for(i=0;i<num_children;i++){
 		if(!linkaddr_cmp(&linkaddr_null,&children[i])){
-			printf("removing %d\n", children[i].u8[0]);
 			abandon(&children[i]);
 			children[i] = linkaddr_null;
 		}
@@ -197,7 +196,7 @@ static void adopt(linkaddr_t* child){
 	pck.type = CHILD_HELLO;
 	pck.src = linkaddr_node_addr;
 	pck.dst = *child;
-	printf("trying to adopt %d\n",child->u8[0]);
+	//printf("trying to adopt %d\n",child->u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(&pck,sizeof(packet));
 	unicast_send(&uconn,child);
@@ -247,10 +246,10 @@ static void trim_neighbours(){
 	}
 }
 static void discover(){
-	print_neighbours();
-	print_children();
+	//print_neighbours();
+	//print_children();
 	print_parent();
-	print_route();
+	//print_route();
 	trim_neighbours();
 	remove_dead_children();
 	if(has_parent){
@@ -292,7 +291,7 @@ static void add_route(linkaddr_t* dst, const linkaddr_t* child){
 //received an adoption confirmation (PARENT_ACK) from a child
 //insert him in my children list
 static void confirm_adoption(linkaddr_t* child){
-	printf("confirming addoption of %d\n",child->u8[0]);
+	//printf("confirming addoption of %d\n",child->u8[0]);
 	add_route(child, child);
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
@@ -380,6 +379,8 @@ PROCESS_THREAD(unicast_process, ev, data){
 	unicast_open(&uconn,146,&unicast_callbacks);
 	broadcast_open(&bconn,129,&broadcast_callbacks);
 	static struct etimer et;
+	static int data_counter;
+	data_counter = random_rand()%3;
 	etimer_set(&et, CLOCK_SECOND*linkaddr_node_addr.u8[0]*2);
 	while(1){
 		PROCESS_WAIT_EVENT();
@@ -391,10 +392,14 @@ PROCESS_THREAD(unicast_process, ev, data){
 		}
 		if(etimer_expired(&et)){
 			discover();
+			printf("%d\n",data_counter);
+			data_counter++;
+			if(data_counter%3==0 && has_parent){
+				send_data();
+			}
 			etimer_set(&et, CLOCK_SECOND*20);
 		}
 	}
 	PROCESS_END();
 }
-
 
