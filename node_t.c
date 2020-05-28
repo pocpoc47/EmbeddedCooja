@@ -112,7 +112,7 @@ static void recv_discover(linkaddr_t* disc){
 	}
 	else{
 		pck.type = HELLO_ORPHAN;
-		//printf("pls i am orphan\n");
+		printf("pls i am orphan\n");
 	}
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
@@ -133,17 +133,41 @@ static void sent_broadcast(struct broadcast_conn *conn, int status, int num_tx){
 	//printf("Broadcast sent: status %d num_tx: %d\n",status,num_tx);
 }
 
+static void abandon(linkaddr_t* child){
+	packet pck;
+	pck.src = linkaddr_node_addr;
+	pck.dst = *child;
+	pck.type = ABANDON_CHILD;
+	packetbuf_clear();
+	packetbuf_copyfrom(&pck,sizeof(packet));
+	printf("abondoning %d\n", child->u8[0]);
+	unicast_send(&uconn,&pck.dst);
+}
+
+static void get_abandoned(){
+	int i;
+	for(i=0;i<num_children;i++){
+		if(!linkaddr_cmp(&linkaddr_null,&children[i])){
+			printf("removing %d\n", children[i].u8[0]);
+			abandon(&children[i]);
+			children[i] = linkaddr_null;
+		}
+	}
+	num_children = 0;
+	has_parent = 0;
+	my_parent = linkaddr_null;
+	printf("my parent is dead, I am now orphan\n");
+}
 
 //remove parent if he is no longer a neighbour
 static void remove_dead_parent(){
 	
 	if(!contains_nb(&my_parent)){
 		//parent is dead :(
-		has_parent = 0;
-		my_parent = linkaddr_null;
-		printf("my parent is dead, I am now orphan\n");
+		get_abandoned();
 	}
 }
+
 
 //remove nodes that are children but not neighbours
 static void remove_dead_children(){
@@ -313,8 +337,11 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 		else if(pck->type==HELLO_ORPHAN || pck->type==HELLO_CHILD){
 			recv_hello(pck);
 		}
-		if(pck->type == CHILD_HELLO){
+		else if(pck->type == CHILD_HELLO){
 			get_adopted(&pck->src);
+		}
+		else if(pck->type == ABANDON_CHILD){
+			get_abandoned();
 		}
 	}
 	else if(linkaddr_cmp(&pck->dst,&server_addr)){
