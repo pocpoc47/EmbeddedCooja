@@ -27,7 +27,7 @@ class Server:
         """Send a message to a mote so that it opens its valve."""
         #sec = 10 * 60
         sec = 0.5 * 60
-        process = Thread(target=wait, args=(sec, moteId))
+        process = Thread(target=wait_for_close_valve, args=(sec, moteId))
         process.start()
         
     def wait_for_close_valve(self, sec, moteId):
