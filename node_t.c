@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 //#include "net/ipv6/uip-ds6.h"
 //#include "net/ip/uip-udp-packet.h"
@@ -10,6 +11,7 @@
 #include "contiki.h"
 #include "net/rime/rime.h"
 #include "dev/button-sensor.h"
+#include "random.h"
 
 #include "node.h"
 
@@ -274,12 +276,12 @@ static void confirm_adoption(linkaddr_t* child){
 static void send_data(){
 	packet pck;
 	pck.src = linkaddr_node_addr;
-	printf("%d is me\n",pck.src.u8[0]);
 	pck.dst = server_addr;
 	pck.type= SENSOR_DATA;
+	pck.data = random_rand()%50;
+	printf("Sending to server, data = %d\n",pck.data);
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	unicast_send(&uconn, &my_parent);
-	
 }
 static void relay_child(packet* pck){
 	packetbuf_clear();
@@ -304,7 +306,6 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 		}
 		else if(pck->type==SENSOR_COMMAND){
 			printf("received command from server\n");
-
 		}
 		else if(pck->type==PARENT_ACK){
 			confirm_adoption(&pck->src);

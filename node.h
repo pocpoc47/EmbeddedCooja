@@ -9,6 +9,9 @@
 
 #define MAX_CHILDREN 4
 #define MAX_NEIGHBOURS 10
+#define MAX_COMP 2
+#define MAX_DATA 5
+#define COMP_SCORE 5
 static struct unicast_conn uconn;
 static struct broadcast_conn bconn;
 
