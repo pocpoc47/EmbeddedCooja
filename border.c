@@ -305,9 +305,12 @@ PROCESS_THREAD(unicast_process, ev, data){
 
 			printf("button pressed\n");
 		}
-		if(etimer_expired(&et)){
+		else if(etimer_expired(&et)){
 			discover();
 			etimer_set(&et, CLOCK_SECOND*20);
+		}
+		else if(ev == serial_line_event_message){
+			printf("received %s\n", (char*)data);
 		}
 	}
 	PROCESS_END();
