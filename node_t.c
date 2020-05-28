@@ -12,6 +12,7 @@
 #include "net/rime/rime.h"
 #include "dev/button-sensor.h"
 #include "random.h"
+#include "dev/leds.h"
 
 #include "node.h"
 
@@ -27,6 +28,8 @@ static linkaddr_t children[MAX_CHILDREN];
 static int neighbours[MAX_NEIGHBOURS];
 static linkaddr_t route[MAX_NEIGHBOURS];
 static linkaddr_t server_addr;
+
+int valve_status = 0;
 
 int num_children = 0;
 int num_neighbours = 0;
@@ -154,6 +157,7 @@ static void get_abandoned(){
 	}
 	num_children = 0;
 	has_parent = 0;
+	leds_off(LEDS_GREEN);
 	my_parent = linkaddr_null;
 	printf("my parent is dead, I am now orphan\n");
 }
@@ -226,6 +230,7 @@ static void get_adopted(linkaddr_t* parent){
 		pck_ack.dst = *parent;
 		pck_ack.src = linkaddr_node_addr;
 		has_parent = 1;
+		leds_on(LEDS_GREEN);
 		my_parent = *parent;
 		
 		packetbuf_clear();
@@ -319,6 +324,16 @@ static void relay_parent(packet* pck,const linkaddr_t* from){
 	unicast_send(&uconn,&my_parent);
 	printf("from %d relay to parent %d\n",pck->src.u8[0],my_parent.u8[0]);
 }
+static void open_valve(){
+	printf("Opening valve..\n");
+	leds_on(LEDS_BLUE);
+	valve_status = 1;
+}
+static void close_valve(){
+	printf("Closing valve..\n");
+	leds_off(LEDS_BLUE);
+	valve_status = 0;
+}
 static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	packet* pck = (packet*)packetbuf_dataptr();
 	add_neighbour(from);
@@ -327,8 +342,11 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 		if(pck->type==SENSOR_DATA){
 			printf("received message from %d\n",pck->src.u8[0]);
 		}
-		else if(pck->type==SENSOR_COMMAND){
-			printf("received command from server\n");
+		else if(pck->type==SENSOR_CLOSE){
+			close_valve();
+		}
+		else if(pck->type==SENSOR_OPEN){
+			open_valve();
 		}
 		else if(pck->type==PARENT_ACK){
 			confirm_adoption(&pck->src);

@@ -235,7 +235,7 @@ static void recv_data(packet* rcv_pck){
 	packet pck;
 	pck.src = linkaddr_node_addr;
 	pck.dst = rcv_pck->src;
-	pck.type= SENSOR_COMMAND;
+	pck.type= SENSOR_OPEN;
 	printf("sending to %d for %d\n",route[pck.dst.u8[0]], pck.dst.u8[0]);
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	unicast_send(&uconn, &route[pck.dst.u8[0]]);

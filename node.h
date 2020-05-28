@@ -4,8 +4,9 @@
 #define DISCOVER 4
 #define HELLO_ORPHAN 5
 #define HELLO_CHILD 6
-#define SENSOR_COMMAND 7
-#define ABANDON_CHILD 8
+#define SENSOR_OPEN 7
+#define SENSOR_CLOSE 8
+#define ABANDON_CHILD 9
 
 
 #define MAX_CHILDREN 4

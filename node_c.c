@@ -7,6 +7,7 @@
 #include "contiki.h"
 #include "net/rime/rime.h"
 #include "dev/button-sensor.h"
+#include "dev/leds.h"
 
 #include "node.h"
 
@@ -164,6 +165,7 @@ static void get_abandoned(){
 	}
 	num_children = 0;
 	has_parent = 0;
+	leds_off(LEDS_GREEN);
 	my_parent = linkaddr_null;
 	printf("my parent is dead, I am now orphan\n");
 }
@@ -235,6 +237,7 @@ static void get_adopted(linkaddr_t* parent){
 		pck_ack.dst = *parent;
 		pck_ack.src = linkaddr_node_addr;
 		has_parent = 1;
+		leds_on(LEDS_GREEN);
 		my_parent = *parent;
 		
 		packetbuf_clear();
@@ -373,7 +376,7 @@ static void print_data(int index){
 }
 static void compute_data(int index){
 	//print_data(index);
-	send_data(&computated[index], SENSOR_COMMAND);
+	send_data(&computated[index], SENSOR_OPEN);
 }
 static void add_comp(linkaddr_t* addr){
 	int i;
