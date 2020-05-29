@@ -2,6 +2,7 @@
 Embedded devices project UCL
 
 You need Cooja on Contiki 3 to run this project.
+
 Installation:
 1. Put the c and h files in the contiki folder
 2. Download serial2pty here and follow the installation instructions: https://github.com/cmorty/cooja-serial2pty
