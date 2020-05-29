@@ -1,0 +1,52 @@
+node1
+|
+|
+|
+node2 ---------node4
+|
+|
+|
+|
+node3
+|
+|
+|
+|
+node5
+
+
+
+pck.srr = 5
+pck.dst = 1
+
+
+
+
+1.
+
+
+2.
+
+1:1
+2:2
+3:3
+4:4
+5:3
+
+relayNode()
+	if dst != me{
+		rout[src] = from
+	}
+relayServ()
+	if dst != me{
+		envoie route[src]
+	}
+
+3.
+
+
+
+4.
+
+
+5.
