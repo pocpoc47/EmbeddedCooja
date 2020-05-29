@@ -375,8 +375,21 @@ static void print_data(int index){
 	*/
 }
 static void compute_data(int index){
-	//print_data(index);
-	send_data(&computated[index], SENSOR_OPEN);
+	print_data(index);
+        if(comp_data_index[index][0]<2){
+            return;
+        }
+        int next = comp_data_index[index][1];
+        int last = (next-1+MAX_DATA)%MAX_DATA;
+        int previous = (next-2+MAX_DATA)%MAX_DATA;
+        printf("%d >? %d\n", comp_data[index][last], comp_data[index][previous]);
+        if(comp_data[index][last] > comp_data[index][previous]){
+            send_data(&computated[index], SENSOR_OPEN);
+        }
+        else{
+            send_data(&computated[index], SENSOR_CLOSE);
+        }
+        
 }
 static void add_comp(linkaddr_t* addr){
 	int i;
@@ -393,17 +406,17 @@ static void add_comp(linkaddr_t* addr){
 }
 static void add_data(linkaddr_t* addr, int data){
 	int i;
-	for(i = 0; i < 5; i++){
+	for(i = 0; i < MAX_COMP; i++){
 		if(linkaddr_cmp(addr, &computated[i]))
 			break;
 	}
-	if(i==5)printf("Error, addr not in comp\n");
+	if(i==MAX_COMP)printf("Error, addr not in comp\n");
 	comp_score[i] = COMP_SCORE;
 
 	int num = comp_data_index[i][0];
 	int next = comp_data_index[i][1];
 
-	//printf("num: %d, next: %d, trying to add %d\n", num, next, data);
+	printf("num: %d, next: %d, trying to add %d\n", num, next, data);
 	comp_data[i][next++] = data;
 	next = next%MAX_DATA;
 	if(num < MAX_DATA)num++;

@@ -9,7 +9,7 @@ from threading import Thread
 SENSOR_OPEN = 7
 SENSOR_CLOSE = 8
 THRESHOLD = 0.3
-MAX_NBR_SENSOR_VALUES = 30
+MAX_NBR_SENSOR_VALUES = 4
 TIME_VALVE_OPEN = 0.5   # Unit -> seconds
 
 
@@ -30,48 +30,38 @@ class Server:
         with open(self.path, "wb+", buffering=0) as term:
             term.write(request.encode())
 
-    def run(self):
-        """Main function server. Connexion with border router by Serial2pty."""
-        # Opening of Serial device in order to read and write packet from border router.
-        with open(self.path, "wb+", buffering=0) as term:
-            while 1: 
-                c=''
-                buf=""
-                while c != '\n':
-                    c = term.read(1).decode()
-                    buf = buf+c
-                    #print(term.read(1).decode(), end='')
-                    sys.stdout.flush()
-                buf = buf.strip('\n');
-
-                if(re.match("^\d{1,2}/\d{1,2}$",buf ) is None):
-                    print("Wrong format")
-                    continue
-
-                t = buf.strip('\n').split('/')
-                node = t[0]
-                value = t[1]
-                #update_node(node, value)
-                self.send_data("{}/{}\n".format(node,SENSOR_CLOSE))
-                print("node = "+str(node))
-                print("value = "+str(value))
         
     def update_node(self, node, value):
         """Update the sensor value list of a node with the last receipt."""
         if node in self.nodes:
-            if len(node) == MAX_NBR_SENSOR_VALUES:
-                node.pop(0)
-                node.append(value)
+            #print("node is known")
+            if len(self.nodes[node]) >= MAX_NBR_SENSOR_VALUES:
+                self.nodes[node].pop(0)
+            self.nodes[node].append(value)
         else:   # If node is unknown by the server
+            #print("node unknown")
             self.nodes[node] = [value]
+        for n in self.nodes:
+            print(str(n) + ": " + str(self.nodes[n]))
            
+    def process_node(self, node):
+        if(len(self.nodes[node])<2):
+            return
+        print(str(self.nodes[node][-1]) + " >? " + str(self.nodes[node][-2]))
+        if(self.nodes[node][-1] > self.nodes[node][-2]):
+            print("yes")
+            self.send_open_valve(node)
+        else:
+            print("NO")
+            self.send_close_valve(node)
     def send_open_valve(self, moteId):
         """Send a message to a mote so that it opens its valve."""
         request = "{}/{}\n".format(moteId, SENSOR_OPEN)
+        print("Opening {}\n".format(moteId))
         self.send_data(request)
         # Timer untill the sending of closure message
-        process = Thread(target=wait_for_close_valve, args=(TIME_VALVE_OPEN, moteId))
-        process.start()
+        #process = Thread(target=wait_for_close_valve, args=(TIME_VALVE_OPEN, moteId))
+        #process.start()
         
     def wait_for_close_valve(self, sec, moteId):
         """Create a Thread in order to send the closing message to a mote."""
@@ -82,6 +72,7 @@ class Server:
     def send_close_valve(self, moteId):
         """Send a message to a mote so that it closes its valve.""" 
         request = "{}/{}\n".format(moteId, SENSOR_CLOSE)
+        print("Closing {}\n".format(moteId))
         self.send_data(request)
                 
 
@@ -119,6 +110,32 @@ class Server:
         return prevision
      
      
+    def run(self):
+        """Main function server. Connexion with border router by Serial2pty."""
+        # Opening of Serial device in order to read and write packet from border router.
+        with open(self.path, "wb+", buffering=0) as term:
+            while 1: 
+                c=''
+                buf=""
+                while c != '\n':
+                    c = term.read(1).decode()
+                    buf = buf+c
+                    #print(term.read(1).decode(), end='')
+                    sys.stdout.flush()
+                buf = buf.strip('\n');
+
+                if(re.match("^\d{1,2}/\d{1,2}$",buf ) is None):
+                    #print("Wrong format")
+                    continue
+
+                t = buf.split('/')
+                node = int(t[0])
+                value = int(t[1])
+                self.update_node(node, value)
+                self.process_node(node)
+                #self.send_data("{}/{}\n".format(node,SENSOR_OPEN))
+                #print("node = "+str(node))
+                #print("value = "+str(value))
     
 
 def main():
