@@ -19,36 +19,25 @@ static int neighbours[MAX_NEIGHBOURS];
 static linkaddr_t route[MAX_NEIGHBOURS];
 static linkaddr_t server_addr;
 
+//list of the nodes it will handle
 static linkaddr_t computated[MAX_COMP];
 static int num_comp = 0;
+//metadata for each node
 static int comp_data_index[MAX_COMP][2];
+//keep-alive score of each nod
 static int comp_score[MAX_COMP];
+//actual data for each node
 static int comp_data[MAX_COMP][MAX_DATA];
+
 
 static int valve_to_close;
 
 
-/*
-
-[1,2,3,4]
-[2,3,4,5]
-[5,2,3,4,]
-[5,6,3,4]
-
-end = 1
-start = 1
-
-
-
-*/
 int num_children = 0;
-int num_neighbours = 0;
 int has_parent = 0;
 
 PROCESS(unicast_process, "unicast process");
 PROCESS(close_valve, "close valva");
-//PROCESS(comput_process, "computation process");
-//AUTOSTART_PROCESSES(&unicast_process,&comput_process);
 AUTOSTART_PROCESSES(&unicast_process);
 
 static void print_array(linkaddr_t* array,int* arraySize){
@@ -101,13 +90,6 @@ static int insert_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	if(contains_addr(addr,array,arraySize)){
 		return 0;
 	}
-	/*
-	printf("pointer: %p\n",array);
-	printf("size = %d\n",*arraySize);
-	printf("0: %d\n",array[0].u8[0]);
-	printf("1: %d\n",array[1].u8[0]);
-	printf("2: %d\n",array[2].u8[0]);
-	*/
 	array[(*arraySize)++] = *addr;
 	//printf("added %d.%d to the list\n",addr->u8[0],addr->u8[1]);
 	return 1;
@@ -128,7 +110,6 @@ static void recv_discover(linkaddr_t* disc){
 	}
 	else{
 		pck.type = HELLO_ORPHAN;
-		//printf("pls i am orphan\n");
 	}
 	pck.dst = *disc;
 	pck.src = linkaddr_node_addr;
@@ -148,6 +129,7 @@ static void recv_broadcast(struct broadcast_conn *conn, const linkaddr_t *from){
 static void sent_broadcast(struct broadcast_conn *conn, int status, int num_tx){
 	//printf("Broadcast sent: status %d num_tx: %d\n",status,num_tx);
 }
+//send a message to a child to notify that he is no longer its child
 static void abandon(linkaddr_t* child){
 	packet pck;
 	pck.src = linkaddr_node_addr;
@@ -159,10 +141,12 @@ static void abandon(linkaddr_t* child){
 	unicast_send(&uconn,&pck.dst);
 }
 
+//parent is dead, removing as parent
 static void get_abandoned(){
 	int i;
 	for(i=0;i<num_children;i++){
 		if(!linkaddr_cmp(&linkaddr_null,&children[i])){
+                    //abandon all children so that the tree can rebuild itself correclty
 			abandon(&children[i]);
 			children[i] = linkaddr_null;
 		}
@@ -252,7 +236,6 @@ static void get_adopted(linkaddr_t* parent){
 		printf("already have a parent\n");
 	}
 }
-//Sending a broadcast to discover a node's neighbours
 static void trim_neighbours(){
 	int i;
 	for(i = 0;i<MAX_NEIGHBOURS;i++){
@@ -261,6 +244,7 @@ static void trim_neighbours(){
 		}
 	}
 }
+//Sending a broadcast to discover a node's neighbours
 static void discover(){
 	//print_neighbours();
 	//print_children();
@@ -272,25 +256,7 @@ static void discover(){
 		remove_dead_parent();
 	}
 
-	/*
-	tableau de voisins
-	[0] = 0
-	[1] = 0
-	[2] = 0
-	[3] = 0
-	[4] = 3
-	[30] = 3
-	{0: 0,30: 3, 4:3}
-	tout 
 
-
-	*/
-
-
-
-	//clear neighbours list, to refill with actual neighbours	
-	num_neighbours = 0;
-	//quand appeler ces fonctions? idealement apres avoir recu tous les HELLO des voisins, mais comment le savoir?
 	packet pck;
 	pck.type = DISCOVER;
 	pck.src = linkaddr_node_addr;
@@ -320,14 +286,15 @@ static void send_data(linkaddr_t* to, int command){
 	pck.type= command;
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	unicast_send(&uconn, &route[to->u8[0]]);
-	
 }
+//relay packet from server to the correct child, using the routing table
 static void relay_child(packet* pck){
 	//printf("from server to %d, relay to child %d\n",pck->dst.u8[0],route[pck->dst.u8[0]].u8[0]);
 	packetbuf_clear();
 	packetbuf_copyfrom(pck,sizeof(*pck));
 	unicast_send(&uconn,&route[pck->dst.u8[0]]);
 }
+//relay packet at destination of the server to the parent
 static void relay_parent(packet* pck,const linkaddr_t* from){
 	packetbuf_clear();
 	packetbuf_copyfrom(pck,sizeof(*pck));
@@ -335,6 +302,7 @@ static void relay_parent(packet* pck,const linkaddr_t* from){
 	//printf("from %d relay to parent %d\n",pck->src.u8[0],my_parent.u8[0]);
 }
 
+//remove the node at index index
 static void free_comp(int index){
 	printf("removing %d\n", computated[index].u8[0]);
 	computated[index] = linkaddr_null;
@@ -342,6 +310,7 @@ static void free_comp(int index){
 	comp_data_index[index][1] = 0;
 	num_comp--;
 }
+//remove keep-alive points to all nodes, and remove if 0
 static void remove_points(){
 	int i;
 	for(i = 0; i < MAX_COMP; i++){
@@ -362,14 +331,8 @@ static void print_data(int* tab, int id, int size){
 		printf("%d, ", tab[i]);
 	}
 	printf("\n");
-	//printf("array for %d: ", computated[index].u8[0]);
-	/*
-	for(i = 0; i < MAX_DATA;i++){
-		printf("%d, ",comp_data[index][i]);
-	}
-	printf("\n");
-	*/
 }
+//read the data for the node and put it in the right order in a new array
 static void compute_data(int index){
 	int num = comp_data_index[index][0];
 	int next = comp_data_index[index][1];
@@ -386,33 +349,25 @@ static void compute_data(int index){
             tab[i] = comp_data[index][(start+i)%MAX_DATA];
 	}
 	print_data(tab, computated[index].u8[0], num);
+        //if there is less than 2, does not compute
         if(comp_data_index[index][0]<2){
             return;
         }
+        //calculating the least Square function
         int prev = least_square(comp_data[index], comp_data_index[index][0]);
-        printf("prev = %d\n", prev);
+        printf("prevision = %d\n", prev);
+        //if the orevision is > than THRESHOD, open the valve for 10min
         if(prev > THRESHOLD){
             valve_to_close = computated[index].u8[0];
             send_data(&computated[index], SENSOR_OPEN);
+            //start a process to countdown the 10 minutes
             process_start(&close_valve, NULL);   
+            //sending the address of the node to the process
             process_post_synch(&close_valve, PROCESS_EVENT_CONTINUE, &valve_to_close);
         }
 
-        //int tab[] = {13,45,75,34,12,66,48};
-        //int prev = least_square(tab, 7);
-        /*
-        printf("prev = %d\n", prev);
-        int last = (next-1+MAX_DATA)%MAX_DATA;
-        int previous = (next-2+MAX_DATA)%MAX_DATA;
-        printf("%d >? %d\n", comp_data[index][last], comp_data[index][previous]);
-        if(comp_data[index][last] > comp_data[index][previous]){
-            send_data(&computated[index], SENSOR_OPEN);
-        }
-        else{
-            send_data(&computated[index], SENSOR_CLOSE);
-        }
-        */
 }
+//add a node to the list of node to compute
 static void add_comp(linkaddr_t* addr){
 	int i;
 	for(i = 0; i < 5; i++){
@@ -426,6 +381,7 @@ static void add_comp(linkaddr_t* addr){
 	comp_data_index[i][1] = 0;
 	num_comp++;
 }
+//add data to a node's array
 static void add_data(linkaddr_t* addr, int data){
 	int i;
 	for(i = 0; i < MAX_COMP; i++){
@@ -437,6 +393,8 @@ static void add_data(linkaddr_t* addr, int data){
 
 	int num = comp_data_index[i][0];
 	int next = comp_data_index[i][1];
+        //num is the number of values
+        //next is the index where the next value should be written
 
 	printf("num: %d, next: %d, trying to add %d\n", num, next, data);
 	comp_data[i][next++] = data;
@@ -449,18 +407,23 @@ static void add_data(linkaddr_t* addr, int data){
 
 	compute_data(i);
 }
+//received data from a sensor
+
 static int recv_data(packet* pck){
 	linkaddr_t addr = pck->src;
 	//printf("received from %d, data=%d\n",pck->src.u8[0],pck->data);
+        //add the data if the node is known
 	if(contains_addr(&addr, computated, &num_comp)){
 		add_data(&addr, pck->data);
 		return 1;
 	}
+        //add the node and data if possible
 	else if(num_comp < MAX_COMP){
 		add_comp(&addr);
 		add_data(&addr, pck->data);
 		return 1;
 	}
+        //return 0 if max nodes reached
 	else{
 		return 0;
 	}
@@ -495,7 +458,7 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 			}
 		}
 		else{
-			relay_parent(pck, from);
+			printf("unknown type\n");
 		}
 	}
 	else{
@@ -510,15 +473,6 @@ static void sent_unicast(struct unicast_conn *conn, int status, int num_tx){
 	}
 	//printf("unicast sent to %d.%d: status %d num_tx: %d\n",dest->u8[0],dest->u8[1],status,num_tx);
 }
-/*
-static void child_discovery(){
-	DISCOVER;
-	are my children all alive?
-	remove dead children;
-	max children?
-	adopt orphan neighbour 
-
-*/
 	
 
 
@@ -550,6 +504,7 @@ PROCESS_THREAD(close_valve, ev, data){
         static struct etimer valve_timer;
         etimer_set(&valve_timer, CLOCK_SECOND*VALVE_TIME);
 //        printf("startgin valve process\n");
+        //index of the node for which to close the valve
         int index;
         while(1){
             PROCESS_WAIT_EVENT();

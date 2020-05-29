@@ -25,6 +25,7 @@ class Server:
         print(self.path)
         self.nodes = {}
 
+
     def send_data(self, request):
         """Request sending to the border router via serial communication."""
         with open(self.path, "wb+", buffering=0) as term:
@@ -45,6 +46,7 @@ class Server:
             print(str(n) + ": " + str(self.nodes[n]))
            
     def process_node(self, node):
+            """Compute the leastSquare prevision"""
         if(len(self.nodes[node])<2):
             return
         prev = self.leastSquare_prevision(self.nodes[node])
@@ -58,7 +60,7 @@ class Server:
         request = "{}/{}\n".format(moteId, SENSOR_OPEN)
         print("Opening {}\n".format(moteId))
         self.send_data(request)
-        # Timer untill the sending of closure message
+        # Timer until the sending of closure message
         process = Thread(target=self.wait_for_close_valve, args=(VALVE_TIME, moteId))
         process.start()
         

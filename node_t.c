@@ -6,9 +6,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-//#include "net/ipv6/uip-ds6.h"
-//#include "net/ip/uip-udp-packet.h"
-//#include "net/ip/uip.h"
 #include "contiki.h"
 #include "net/rime/rime.h"
 #include "dev/button-sensor.h"
@@ -17,12 +14,6 @@
 
 #include "node.h"
 
-/*
-static struct uip_udp_conn *client_conn;
-static uip_ipaddr_t server_ipaddr;
-static struct runicast_conn runicast;
-static struct runicast_callbacks data_runicast_call = 0;
-*/
 
 static linkaddr_t my_parent;
 static linkaddr_t children[MAX_CHILDREN];
@@ -89,13 +80,6 @@ static int insert_addr(linkaddr_t* addr, linkaddr_t* array,int* arraySize){
 	if(contains_addr(addr,array,arraySize)){
 		return 0;
 	}
-	/*
-	printf("pointer: %p\n",array);
-	printf("size = %d\n",*arraySize);
-	printf("0: %d\n",array[0].u8[0]);
-	printf("1: %d\n",array[1].u8[0]);
-	printf("2: %d\n",array[2].u8[0]);
-	*/
 	array[(*arraySize)++] = *addr;
 	//printf("added %d.%d to the list\n",addr->u8[0],addr->u8[1]);
 	return 1;
@@ -262,25 +246,7 @@ static void discover(){
 		remove_dead_parent();
 	}
 
-	/*
-	tableau de voisins
-	[0] = 0
-	[1] = 0
-	[2] = 0
-	[3] = 0
-	[4] = 3
-	[30] = 3
-	{0: 0,30: 3, 4:3}
-	tout 
 
-
-	*/
-
-
-
-	//clear neighbours list, to refill with actual neighbours	
-	num_neighbours = 0;
-	//quand appeler ces fonctions? idealement apres avoir recu tous les HELLO des voisins, mais comment le savoir?
 	packet pck;
 	pck.type = DISCOVER;
 	pck.src = linkaddr_node_addr;
@@ -302,6 +268,9 @@ static void confirm_adoption(linkaddr_t* child){
 	insert_addr(child,children,&num_children);
 	printf("%d is now my child\n",child->u8[0]);
 }
+//generate random data to send to the server
+//data is random between 40 and 60
+//and 1 in 5 chance to have (30-40) increment
 static void send_data(){
 	packet pck;
 	pck.src = linkaddr_node_addr;
@@ -366,6 +335,7 @@ static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 			get_abandoned();
 		}
 	}
+        //packet is for server, relay to parent
 	else if(linkaddr_cmp(&pck->dst,&server_addr)){
 		relay_parent(pck, from);
 	}
@@ -380,15 +350,6 @@ static void sent_unicast(struct unicast_conn *conn, int status, int num_tx){
 	}
 	//printf("unicast sent to %d.%d: status %d num_tx: %d\n",dest->u8[0],dest->u8[1],status,num_tx);
 }
-/*
-static void child_discovery(){
-	DISCOVER;
-	are my children all alive?
-	remove dead children;
-	max children?
-	adopt orphan neighbour 
-
-*/
 
 
 static const struct unicast_callbacks unicast_callbacks = {recv_unicast,sent_unicast};
@@ -411,12 +372,11 @@ PROCESS_THREAD(unicast_process, ev, data){
 		if(ev == sensors_event){
 
 			printf("button pressed\n");
-			send_data();
-			discover();
 		}
 		if(etimer_expired(&et)){
 			discover();
 			//printf("%d\n",data_counter);
+                        //once every 3 expiration, send data
 			data_counter++;
 			if(data_counter%3==0 && has_parent){
 				send_data();
