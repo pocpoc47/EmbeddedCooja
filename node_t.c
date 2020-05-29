@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
 
 //#include "net/ipv6/uip-ds6.h"
 //#include "net/ip/uip-udp-packet.h"
@@ -306,7 +307,11 @@ static void send_data(){
 	pck.src = linkaddr_node_addr;
 	pck.dst = server_addr;
 	pck.type= SENSOR_DATA;
-	pck.data = random_rand()%50;
+	int val = 40+random_rand()%20;
+        if(!(random_rand()%5)){
+                val += random_rand()%10+30;
+        }
+        pck.data = val;
 	printf("Sending to server, data = %d\n",pck.data);
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	unicast_send(&uconn, &my_parent);
@@ -391,6 +396,7 @@ static const struct broadcast_callbacks broadcast_callbacks = {recv_broadcast,se
 
 PROCESS_THREAD(unicast_process, ev, data){
 	PROCESS_BEGIN();
+        random_init(5);
 	server_addr.u8[0] = 1;
 	server_addr.u8[1] = 0;
 	SENSORS_ACTIVATE(button_sensor);

@@ -9,8 +9,8 @@ from threading import Thread
 SENSOR_OPEN = 7
 SENSOR_CLOSE = 8
 THRESHOLD = 0.3
-MAX_NBR_SENSOR_VALUES = 4
-TIME_VALVE_OPEN = 0.5   # Unit -> seconds
+MAX_NBR_SENSOR_VALUES = 30
+TIME_VALVE_OPEN = 6   # Unit -> seconds
 
 
 
@@ -47,21 +47,23 @@ class Server:
     def process_node(self, node):
         if(len(self.nodes[node])<2):
             return
+        prev = self.leastSquare_prevision(self.nodes[node])
+        print(prev)
         print(str(self.nodes[node][-1]) + " >? " + str(self.nodes[node][-2]))
         if(self.nodes[node][-1] > self.nodes[node][-2]):
             print("yes")
             self.send_open_valve(node)
         else:
             print("NO")
-            self.send_close_valve(node)
+            #self.send_close_valve(node)
     def send_open_valve(self, moteId):
         """Send a message to a mote so that it opens its valve."""
         request = "{}/{}\n".format(moteId, SENSOR_OPEN)
         print("Opening {}\n".format(moteId))
         self.send_data(request)
         # Timer untill the sending of closure message
-        #process = Thread(target=wait_for_close_valve, args=(TIME_VALVE_OPEN, moteId))
-        #process.start()
+        process = Thread(target=self.wait_for_close_valve, args=(TIME_VALVE_OPEN, moteId))
+        process.start()
         
     def wait_for_close_valve(self, sec, moteId):
         """Create a Thread in order to send the closing message to a mote."""
