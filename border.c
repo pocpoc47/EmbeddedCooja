@@ -321,7 +321,7 @@ PROCESS_THREAD(unicast_process, ev, data){
 		}
 		else if(etimer_expired(&et)){
 			discover();
-			etimer_set(&et, CLOCK_SECOND*20);
+			etimer_set(&et, CLOCK_SECOND*DISCOVER_INTERVAL);
 		}
 		else if(ev == serial_line_event_message){
                         recv_command((char*)data);

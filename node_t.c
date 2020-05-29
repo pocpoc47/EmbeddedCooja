@@ -421,7 +421,7 @@ PROCESS_THREAD(unicast_process, ev, data){
 			if(data_counter%3==0 && has_parent){
 				send_data();
 			}
-			etimer_set(&et, CLOCK_SECOND*20);
+			etimer_set(&et, CLOCK_SECOND*DISCOVER_INTERVAL);
 		}
 	}
 	PROCESS_END();

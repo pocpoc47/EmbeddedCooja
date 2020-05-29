@@ -10,6 +10,7 @@
 #include "dev/leds.h"
 
 #include "node.h"
+#include "least_square.h"
 
 
 static linkaddr_t my_parent;
@@ -23,6 +24,8 @@ static int num_comp = 0;
 static int comp_data_index[MAX_COMP][2];
 static int comp_score[MAX_COMP];
 static int comp_data[MAX_COMP][MAX_DATA];
+
+static int valve_to_close;
 
 
 /*
@@ -43,6 +46,7 @@ int num_neighbours = 0;
 int has_parent = 0;
 
 PROCESS(unicast_process, "unicast process");
+PROCESS(close_valve, "close valva");
 //PROCESS(comput_process, "computation process");
 //AUTOSTART_PROCESSES(&unicast_process,&comput_process);
 AUTOSTART_PROCESSES(&unicast_process);
@@ -351,19 +355,11 @@ static void remove_points(){
 		}
 	}
 }
-static void print_data(int index){
-	int num = comp_data_index[index][0];
-	int next = comp_data_index[index][1];
+static void print_data(int* tab, int id, int size){
+	printf("data for %d: ", id);
 	int i;
-	int start;
-	printf("data for %d: ", computated[index].u8[0]);
-	if(num==MAX_DATA){
-		start = next;
-	}else{
-		start = 0;
-	}
-	for(i = 0; i < num;i++){
-		printf("%d, ", comp_data[index][(start+i)%MAX_DATA]);
+        for(i = 0; i < size;i++){
+		printf("%d, ", tab[i]);
 	}
 	printf("\n");
 	//printf("array for %d: ", computated[index].u8[0]);
@@ -375,11 +371,37 @@ static void print_data(int index){
 	*/
 }
 static void compute_data(int index){
-	print_data(index);
+	int num = comp_data_index[index][0];
+	int next = comp_data_index[index][1];
+	int i;
+	int start;
+        int tab[num];
+	printf("data for %d: ", computated[index].u8[0]);
+	if(comp_data_index[index][0]>=MAX_DATA){
+            start = comp_data_index[index][1];
+	}else{
+            start = 0;
+	}
+	for(i = 0; i < num;i++){
+            tab[i] = comp_data[index][(start+i)%MAX_DATA];
+	}
+	print_data(tab, computated[index].u8[0], num);
         if(comp_data_index[index][0]<2){
             return;
         }
-        int next = comp_data_index[index][1];
+        int prev = least_square(comp_data[index], comp_data_index[index][0]);
+        printf("prev = %d\n", prev);
+        if(prev > THRESHOLD){
+            valve_to_close = computated[index].u8[0];
+            send_data(&computated[index], SENSOR_OPEN);
+            process_start(&close_valve, NULL);   
+            process_post_synch(&close_valve, PROCESS_EVENT_CONTINUE, &valve_to_close);
+        }
+
+        //int tab[] = {13,45,75,34,12,66,48};
+        //int prev = least_square(tab, 7);
+        /*
+        printf("prev = %d\n", prev);
         int last = (next-1+MAX_DATA)%MAX_DATA;
         int previous = (next-2+MAX_DATA)%MAX_DATA;
         printf("%d >? %d\n", comp_data[index][last], comp_data[index][previous]);
@@ -389,7 +411,7 @@ static void compute_data(int index){
         else{
             send_data(&computated[index], SENSOR_CLOSE);
         }
-        
+        */
 }
 static void add_comp(linkaddr_t* addr){
 	int i;
@@ -517,9 +539,30 @@ PROCESS_THREAD(unicast_process, ev, data){
 		if(etimer_expired(&et)){
 			remove_points();
 			discover();
-			etimer_set(&et, CLOCK_SECOND*20);
+			etimer_set(&et, CLOCK_SECOND*DISCOVER_INTERVAL);
 		}
 	}
 	PROCESS_END();
+}
+
+PROCESS_THREAD(close_valve, ev, data){
+        PROCESS_BEGIN();
+        static struct etimer valve_timer;
+        etimer_set(&valve_timer, CLOCK_SECOND*VALVE_TIME);
+//        printf("startgin valve process\n");
+        int index;
+        while(1){
+            PROCESS_WAIT_EVENT();
+            if(etimer_expired(&valve_timer)){
+                //printf("valve timer expired, closing %d\n", computated[index].u8[0]);
+                send_data(&computated[index], SENSOR_CLOSE);
+                PROCESS_EXIT();
+            }
+            else if(ev==PROCESS_EVENT_CONTINUE){
+                index = *(int*)data;
+                //printf("received msg, node = %d, ptr = %p\n", index, data);
+            }
+        }
+        PROCESS_END();
 }
 
