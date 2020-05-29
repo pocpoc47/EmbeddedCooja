@@ -4,7 +4,12 @@ import os
 import time
 from threading import Thread
 
+
+SENSOR_OPEN = 7
+SENSOR_CLOSE = 8
 THRESHOLD = 0.3
+MAX_NBR_SENSOR_VALUES = 30
+TIME_VALVE_OPEN = 0.5   # Unit -> seconds
 
 class Server:
     def __init__(self, id):
@@ -14,6 +19,8 @@ class Server:
         
         """
         self.path = "/dev/pts/{}".format(id)
+        print(self.path)
+        self.nodes = {}
 
     def run(self):
         """Main function server. Connexion with border router by Serial2pty."""
@@ -22,12 +29,22 @@ class Server:
             while True:
                 print(term.read(1).decode(), end='')
                 sys.stdout.flush()
-               
+        
+    def update_node(self, node, value):
+        """Update de sensor value list of a node with de last receipt."""
+        if node in self.nodes:
+            if len(node) == MAX_NBR_SENSOR_VALUES:
+                node.pop(0)
+                node.append(value)
+        else:   # If node is unkwonw by the server
+            self.nodes[node] = [value]
+           
     def send_open_valve(self, moteId):
         """Send a message to a mote so that it opens its valve."""
-        #sec = 10 * 60
-        sec = 0.5 * 60
-        process = Thread(target=wait_for_close_valve, args=(sec, moteId))
+        request = "{}/{}\n".format(moteId, SENSOR_OPEN)
+        self.send_data(request)
+        # Timer untill the sending of closure message
+        process = Thread(target=wait_for_close_valve, args=(TIME_VALVE_OPEN, moteId))
         process.start()
         
     def wait_for_close_valve(self, sec, moteId):
@@ -38,11 +55,13 @@ class Server:
     
     def send_close_valve(self, moteId):
         """Send a message to a mote so that it closes its valve.""" 
-        pass
+        request = "{}/{}\n".format(moteId, SENSOR_CLOSE)
+        self.send_data(request)
                 
-    def send_data(self, moteId):
+    def send_data(self, request):
+        """Request sending to the border router via serial communication."""
         with open(self.path, "wb+", buffering=0) as term:
-            term.write("test".encode())
+            term.write(request.encode())
 
     def leastSquare_prevision(self, y_values):
         """
@@ -86,8 +105,7 @@ def main():
     args = parser.parse_args()
     
     server = Server(args.id)
-    #server.run()
-    server.send_data(55)
+    server.run()
     
 
 if(__name__ == "__main__"):
