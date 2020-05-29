@@ -410,7 +410,7 @@ PROCESS_THREAD(unicast_process, ev, data){
 		}
 		if(etimer_expired(&et)){
 			discover();
-			printf("%d\n",data_counter);
+			//printf("%d\n",data_counter);
 			data_counter++;
 			if(data_counter%3==0 && has_parent){
 				send_data();

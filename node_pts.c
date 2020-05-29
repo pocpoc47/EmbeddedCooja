@@ -16,7 +16,7 @@ PROCESS_THREAD(serial_process, ev, data){
 	while(1){
 		PROCESS_WAIT_EVENT();
 		if(ev == sensors_event){
-			printf("hello pts\n");
+			printf("5/4\n");
 		}
 		if(ev == serial_line_event_message){
 			printf("received %s\n",(char*) data);

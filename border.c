@@ -216,7 +216,7 @@ static void discover(){
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	broadcast_send(&bconn);
 }
-static void add_route(linkaddr_t* dst, linkaddr_t* child){
+static void add_route(const linkaddr_t* dst, const linkaddr_t* child){
 	route[dst->u8[0]] = *child;
 	//printf("Route %d, send to %d\n", dst->u8[0], child->u8[0]);
 }
@@ -231,15 +231,8 @@ static void confirm_adoption(linkaddr_t* child){
 }
 static void recv_data(packet* rcv_pck){
 	printf("received data from %d\n", rcv_pck->src.u8[0]);
-
-	packet pck;
-	pck.src = linkaddr_node_addr;
-	pck.dst = rcv_pck->src;
-	pck.type= SENSOR_OPEN;
-	printf("sending to %d for %d\n",route[pck.dst.u8[0]], pck.dst.u8[0]);
-	packetbuf_copyfrom(&pck,sizeof(pck));
-	unicast_send(&uconn, &route[pck.dst.u8[0]]);
-
+       
+        printf("%d/%d\n",rcv_pck->src.u8[0],rcv_pck->data);
 }
 static void send_data(linkaddr_t* to,int command){
 	packet pck;
@@ -250,6 +243,27 @@ static void send_data(linkaddr_t* to,int command){
 	packetbuf_copyfrom(&pck,sizeof(pck));
 	unicast_send(&uconn, &route[to->u8[0]]);
 	
+}
+static void recv_command(char* command){
+        int id;
+        int com;
+        int len = strlen(command);
+        if(len==4){
+            id = 10*(command[0]-'0') + command[1]-'0';
+            com = command[3]-'0';
+        }
+        else if(len==3){
+            id = command[0]-'0';
+            com = command[2]-'0';
+        }
+        else{
+            printf("wrong format");
+        }
+
+        linkaddr_t node;
+        node.u8[0] = id;
+        node.u8[1] = 0;
+        send_data(&node, com);
 }
 static void recv_unicast(struct unicast_conn *conn, const linkaddr_t *from){
 	packet* pck = (packet*)packetbuf_dataptr();
@@ -310,7 +324,7 @@ PROCESS_THREAD(unicast_process, ev, data){
 			etimer_set(&et, CLOCK_SECOND*20);
 		}
 		else if(ev == serial_line_event_message){
-			printf("received %s\n", (char*)data);
+                        recv_command((char*)data);
 		}
 	}
 	PROCESS_END();

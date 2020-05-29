@@ -2,6 +2,7 @@ import sys
 import argparse
 import os
 import time
+import re
 from threading import Thread
 
 
@@ -10,6 +11,8 @@ SENSOR_CLOSE = 8
 THRESHOLD = 0.3
 MAX_NBR_SENSOR_VALUES = 30
 TIME_VALVE_OPEN = 0.5   # Unit -> seconds
+
+
 
 class Server:
     def __init__(self, id):
@@ -22,21 +25,44 @@ class Server:
         print(self.path)
         self.nodes = {}
 
+    def send_data(self, request):
+        """Request sending to the border router via serial communication."""
+        with open(self.path, "wb+", buffering=0) as term:
+            term.write(request.encode())
+
     def run(self):
         """Main function server. Connexion with border router by Serial2pty."""
         # Opening of Serial device in order to read and write packet from border router.
         with open(self.path, "wb+", buffering=0) as term:
-            while True:
-                print(term.read(1).decode(), end='')
-                sys.stdout.flush()
+            while 1: 
+                c=''
+                buf=""
+                while c != '\n':
+                    c = term.read(1).decode()
+                    buf = buf+c
+                    #print(term.read(1).decode(), end='')
+                    sys.stdout.flush()
+                buf = buf.strip('\n');
+
+                if(re.match("^\d{1,2}/\d{1,2}$",buf ) is None):
+                    print("Wrong format")
+                    continue
+
+                t = buf.strip('\n').split('/')
+                node = t[0]
+                value = t[1]
+                #update_node(node, value)
+                self.send_data("{}/{}\n".format(node,SENSOR_CLOSE))
+                print("node = "+str(node))
+                print("value = "+str(value))
         
     def update_node(self, node, value):
-        """Update de sensor value list of a node with de last receipt."""
+        """Update the sensor value list of a node with the last receipt."""
         if node in self.nodes:
             if len(node) == MAX_NBR_SENSOR_VALUES:
                 node.pop(0)
                 node.append(value)
-        else:   # If node is unkwonw by the server
+        else:   # If node is unknown by the server
             self.nodes[node] = [value]
            
     def send_open_valve(self, moteId):
@@ -58,10 +84,6 @@ class Server:
         request = "{}/{}\n".format(moteId, SENSOR_CLOSE)
         self.send_data(request)
                 
-    def send_data(self, request):
-        """Request sending to the border router via serial communication."""
-        with open(self.path, "wb+", buffering=0) as term:
-            term.write(request.encode())
 
     def leastSquare_prevision(self, y_values):
         """
